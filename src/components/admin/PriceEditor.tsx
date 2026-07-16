@@ -1,0 +1,13 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import type { PriceItem } from "@/lib/pricing/price-data";
+
+export function PriceEditor() {
+  const [items, setItems] = useState<PriceItem[]>([]);
+  const [status, setStatus] = useState("Chargement des prix actifs...");
+  useEffect(() => { fetch("/api/pricing").then((response) => response.json()).then((data: PriceItem[]) => { setItems(data); setStatus("Prix actifs côté simulateur"); }).catch(() => setStatus("Impossible de charger les prix")); }, []);
+  function change(key: string, field: "low" | "mid" | "high", value: string) { setItems((current) => current.map((item) => item.key === key ? { ...item, [field]: Number(value) } : item)); }
+  async function save(item: PriceItem) { const response = await fetch("/api/admin/pricing", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ key: item.key, low: item.low, mid: item.mid, high: item.high }) }); setStatus(response.ok ? `Enregistré : ${item.label}` : "Erreur : vérifie les bornes"); }
+  return <section className="mt-8 a2e-card p-6"><div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-sm font-black uppercase tracking-[.16em] text-champagne">Source simulateur</p><h2 className="mt-2 text-2xl font-black text-navy">Price list modifiable</h2><p className="mt-1 text-sm text-ink/65">Les prix enregistrés ici sont utilisés par le configurateur public après actualisation.</p></div><p className="text-xs font-bold text-ink/60">{status}</p></div><div className="mt-5 overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead><tr className="border-b border-ink/10 text-xs uppercase tracking-wide text-ink/55"><th className="p-3">Poste</th><th className="p-3">Unité</th><th className="p-3">Bas</th><th className="p-3">Central</th><th className="p-3">Haut</th><th className="p-3">Action</th></tr></thead><tbody>{items.map((item) => <tr key={item.key} className="border-b border-ink/8 align-middle"><td className="p-3"><p className="font-bold text-navy">{item.label}</p><p className="text-xs text-ink/50">{item.category}</p></td><td className="p-3 text-ink/60">{item.unit}</td>{(["low", "mid", "high"] as const).map((field) => <td className="p-3" key={field}><input type="number" min="0" value={item[field]} onChange={(event) => change(item.key, field, event.target.value)} className="min-h-10 w-28 rounded-card border border-ink/15 px-2" /></td>)}<td className="p-3"><button type="button" onClick={() => save(item)} className="min-h-10 rounded-card bg-navy px-3 text-xs font-black text-white">Enregistrer</button></td></tr>)}</tbody></table></div></section>;
+}

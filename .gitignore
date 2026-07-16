@@ -1,0 +1,26 @@
+# Dependencies and package manager caches
+node_modules/
+.pnpm-store/
+
+# Next.js output
+.next/
+out/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Database, reports and generated files
+*.db
+*.db-journal
+.lighthouse/
+output/
+*.log
+
+# Local tools and editor files
+.codex-*
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
