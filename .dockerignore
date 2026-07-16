@@ -1,7 +1,12 @@
+node_modules
 .pnpm-store
 .next
 .git
 .lighthouse
+output
+*.log
+*.tsbuildinfo
+.codex-*
 .env
 .env.*
 !.env.example
