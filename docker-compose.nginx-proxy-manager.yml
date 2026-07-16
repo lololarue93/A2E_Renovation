@@ -1,0 +1,22 @@
+services:
+  nginx-proxy-manager:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: nginx-proxy-manager
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Paris
+      DISABLE_IPV6: "true"
+    ports:
+      - "80:80"
+      - "81:81"
+      - "443:443"
+    volumes:
+      - /volume2/docker/npm/data:/data
+      - /volume2/docker/npm/letsencrypt:/etc/letsencrypt
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:81 >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
