@@ -1,6 +1,7 @@
 FROM node:20-alpine AS base
 WORKDIR /app
-RUN npm install --global pnpm@9.15.4
+RUN apk add --no-cache openssl libc6-compat \
+    && npm install --global pnpm@9.15.4
 
 FROM base AS deps
 COPY package.json pnpm-lock.yaml ./
