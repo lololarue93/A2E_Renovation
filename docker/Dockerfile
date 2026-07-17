@@ -1,4 +1,4 @@
-FROM node:20-slim AS base
+FROM node:22-slim AS base
 WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends openssl ca-certificates \
@@ -7,7 +7,7 @@ RUN apt-get update \
 
 FROM base AS deps
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --force
 
 FROM base AS builder
 ENV DATABASE_URL=postgresql://a2e:build-only@postgres:5432/a2e_renovation?schema=public
@@ -25,4 +25,3 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma ./prisma
 EXPOSE 3000
 CMD ["pnpm", "start"]
-

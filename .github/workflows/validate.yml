@@ -26,10 +26,11 @@ jobs:
           version: 9.15.4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: pnpm
+          node-version: 22
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --force
+      - name: Verify dependency versions
+        run: pnpm list @prisma/client prisma --depth 0
       - name: Generate Prisma client
         run: pnpm exec prisma generate
       - name: Build application
