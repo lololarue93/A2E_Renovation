@@ -6,7 +6,9 @@ function getSessionId() {
   const key = "a2e-session-id";
   const current = window.sessionStorage.getItem(key);
   if (current) return current;
-  const value = crypto.randomUUID();
+  const value = typeof globalThis.crypto?.randomUUID === "function"
+    ? globalThis.crypto.randomUUID()
+    : `a2e-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
   window.sessionStorage.setItem(key, value);
   return value;
 }
