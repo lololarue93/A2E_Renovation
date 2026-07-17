@@ -9,6 +9,9 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     background_color: "#f4f5f7",
     theme_color: "#071a3a",
-    icons: [{ src: "/branding/a2e-logo.jpeg", sizes: "192x192", type: "image/jpeg", purpose: "any maskable" }]
+    icons: [
+      { src: "/branding/a2e-logo.jpeg", sizes: "192x192", type: "image/jpeg", purpose: "any" },
+      { src: "/branding/a2e-logo.jpeg", sizes: "192x192", type: "image/jpeg", purpose: "maskable" }
+    ]
   };
 }
