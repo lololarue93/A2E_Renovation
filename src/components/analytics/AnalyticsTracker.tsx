@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 function getSessionId() {
   const key = "a2e-session-id";
@@ -25,8 +26,8 @@ function track(event: string, label?: string) {
   try {
     const payload = JSON.stringify({ event, label, path: window.location.pathname, sessionId: getSessionId() });
     if (navigator.sendBeacon) {
-      navigator.sendBeacon("/api/analytics", new Blob([payload], { type: "application/json" }));
-      return;
+      const accepted = navigator.sendBeacon("/api/analytics", new Blob([payload], { type: "application/json" }));
+      if (accepted) return;
     }
     void fetch("/api/analytics", { method: "POST", headers: { "content-type": "application/json" }, body: payload, keepalive: true }).catch(() => undefined);
   } catch {
@@ -35,8 +36,13 @@ function track(event: string, label?: string) {
 }
 
 export function AnalyticsTracker() {
+  const pathname = usePathname();
+
   useEffect(() => {
     track("page_view");
+  }, [pathname]);
+
+  useEffect(() => {
     const onClick = (event: MouseEvent) => {
       const target = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-track]") : null;
       if (!target) return;

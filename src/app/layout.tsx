@@ -4,6 +4,8 @@ import Link from "next/link";
 import "./globals.css";
 import { siteSettings } from "@/lib/site-data";
 import { AnalyticsTracker } from "@/components/analytics/AnalyticsTracker";
+import { SocialLinks } from "@/components/marketing/SocialLinks";
+import { getSiteContactSettings } from "@/lib/settings/site-contact-settings";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://a2e-renovation.local"),
@@ -50,7 +52,8 @@ const nav = [
   ["Contact", "/contact"]
 ];
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const contact = await getSiteContactSettings();
   return (
     <html lang="fr">
       <body>
@@ -96,9 +99,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
             <div className="text-sm leading-7 text-white/78">
               <strong className="text-white">Contact</strong>
-              <p><a href={`tel:${siteSettings.phone.replaceAll(" ", "")}`}>{siteSettings.phone}</a></p>
+              <p><a href={`tel:${contact.phone.replace(/[^+\d]/g, "")}`}>{contact.phone}</a></p>
               <p><a href={`mailto:${siteSettings.email}`}>{siteSettings.email}</a></p>
               <p>Réseaux : {siteSettings.social}</p>
+              <div className="mt-3"><SocialLinks /></div>
             </div>
             <div className="text-sm leading-7 text-white/78">
               <strong className="text-white">Informations</strong>

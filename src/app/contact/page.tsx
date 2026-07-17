@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { siteSettings } from "@/lib/site-data";
+import { PhoneQrCard } from "@/components/marketing/PhoneQrCard";
+import { SocialLinks } from "@/components/marketing/SocialLinks";
+import { getSiteContactSettings } from "@/lib/settings/site-contact-settings";
 
 export const metadata: Metadata = {
   title: "Contact",
   description: "Contactez A2E Rénovation pour un projet de fenêtres, isolation, rénovation énergétique ou rénovation globale."
 };
 
-export default function ContactPage() {
+export default async function ContactPage() {
+  const contact = await getSiteContactSettings();
   return (
     <main>
       <section className="photo-hero py-20 text-white">
@@ -22,9 +26,10 @@ export default function ContactPage() {
           <div className="a2e-card bg-white/95 p-7">
             <h2 className="text-2xl font-black text-navy">Coordonnées</h2>
             <p className="mt-4"><strong>Président :</strong> {siteSettings.president}</p>
-            <p><strong>Téléphone :</strong> {siteSettings.phone}</p>
+            <p><strong>Téléphone :</strong> {contact.phone}</p>
             <p><strong>Email :</strong> {siteSettings.email}</p>
             <p><strong>Réseaux :</strong> {siteSettings.social}</p>
+            <div className="mt-5"><SocialLinks /></div>
           </div>
           <div className="a2e-card p-7">
             <h2 className="text-2xl font-black text-navy">Démarrer avec une première fourchette</h2>
@@ -32,6 +37,7 @@ export default function ContactPage() {
             <Link href="/simulateur" className="mt-6 inline-flex rounded-card bg-navy px-5 py-3 font-black text-white">Estimer mon projet</Link>
           </div>
         </div>
+        <div className="container mt-6"><PhoneQrCard /></div>
       </section>
     </main>
   );

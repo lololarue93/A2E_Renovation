@@ -2,8 +2,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, ClipboardCheck, PhoneCall } from "lucide-react";
 import { quickStats, siteSettings } from "@/lib/site-data";
+import { getSiteContactSettings } from "@/lib/settings/site-contact-settings";
 
-export function BrandHero() {
+export async function BrandHero() {
+  const contact = await getSiteContactSettings();
   return (
     <section className="photo-hero relative isolate overflow-hidden text-white">
       <Image
@@ -39,7 +41,7 @@ export function BrandHero() {
             <Link href="/simulateur" data-track="quote_started" data-track-label="Hero - Estimer mon projet" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-card bg-white px-6 font-extrabold text-navy shadow-[0_18px_48px_rgba(5,22,55,.2)] transition hover:-translate-y-0.5 hover:bg-pearl">
               Estimer mon projet <ArrowRight size={18} />
             </Link>
-            <Link href={`tel:${siteSettings.phone.replaceAll(" ", "")}`} data-track="phone_click" data-track-label="Hero - Appeler A2E" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-card border border-white/35 bg-white/12 px-6 font-bold text-white backdrop-blur transition hover:border-champagne hover:bg-white/18">
+            <Link href={`tel:${contact.phone.replace(/[^+\d]/g, "")}`} data-track="phone_click" data-track-label="Hero - Appeler A2E" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-card border border-white/35 bg-white/12 px-6 font-bold text-white backdrop-blur transition hover:border-champagne hover:bg-white/18">
               <PhoneCall size={18} /> Appeler A2E
             </Link>
           </div>
@@ -48,7 +50,7 @@ export function BrandHero() {
             {quickStats.map((stat) => (
               <div key={stat.label} className="rounded-card border border-white/25 bg-white/90 p-4 text-navy shadow-[0_12px_34px_rgba(5,22,55,0.16)] backdrop-blur">
                 <stat.icon className="mb-3 text-champagne" size={22} />
-                <p className="text-xl font-black">{stat.value}</p>
+                <p className="text-xl font-black">{stat.label === "Contact direct" ? contact.phone : stat.value}</p>
                 <p className="text-sm text-ink/60">{stat.label}</p>
               </div>
             ))}

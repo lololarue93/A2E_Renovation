@@ -1,0 +1,9 @@
+type Point = { label: string; views: number; quotes: number; leads: number };
+
+export function AnalyticsTrend({ points }: { points: Point[] }) {
+  const max = Math.max(1, ...points.flatMap((point) => [point.views, point.quotes, point.leads]));
+  const height = 180;
+  const width = 760;
+  const line = (key: "views" | "quotes" | "leads") => points.map((point, index) => `${(index / Math.max(1, points.length - 1)) * width},${height - (point[key] / max) * 145 - 10}`).join(" ");
+  return <div className="mt-5 overflow-x-auto"><div className="min-w-[680px]"><div className="mb-3 flex flex-wrap gap-4 text-xs font-bold text-ink/65"><span><i className="mr-2 inline-block h-2 w-2 rounded-full bg-navy" />Visites</span><span><i className="mr-2 inline-block h-2 w-2 rounded-full bg-champagne" />Simulateurs</span><span><i className="mr-2 inline-block h-2 w-2 rounded-full bg-[#4b7d68]" />Leads</span></div><svg viewBox={`0 0 ${width} ${height + 30}`} role="img" aria-label="Évolution des visites, simulateurs et leads sur 30 jours" className="h-auto w-full"><line x1="0" y1={height - 10} x2={width} y2={height - 10} stroke="currentColor" className="text-ink/10" /><polyline points={line("views")} fill="none" stroke="#071a3a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /><polyline points={line("quotes")} fill="none" stroke="#b09a6a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /><polyline points={line("leads")} fill="none" stroke="#4b7d68" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />{points.filter((_, index) => index % 5 === 0 || index === points.length - 1).map((point, index) => <text key={`${point.label}-${index}`} x={(points.indexOf(point) / Math.max(1, points.length - 1)) * width} y={height + 15} textAnchor="middle" className="fill-ink/45 text-[10px]">{point.label}</text>)}</svg></div></div>;
+}

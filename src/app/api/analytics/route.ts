@@ -23,7 +23,8 @@ export async function POST(request: NextRequest) {
       }
     });
     return new NextResponse(null, { status: 204 });
-  } catch {
+  } catch (error) {
+    console.error("[analytics] event rejected", error);
     return new NextResponse(null, { status: 204 });
   }
 }
