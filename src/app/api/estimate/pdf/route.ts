@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { generateEstimatePdf } from "@/lib/pdf/generate-estimate-pdf";
 import { emitWebhook } from "@/lib/webhooks/emit-webhook";
 import { prisma } from "@/lib/db/prisma";
+import { sendLeadNotification } from "@/lib/email/send-lead-notification";
 
 export async function GET(request: NextRequest) {
   const search = request.nextUrl.searchParams;
@@ -15,6 +16,18 @@ export async function GET(request: NextRequest) {
   await emitWebhook("estimate.pdf_generated", { estimateId, name, low, mid, high }).catch(() => undefined);
   const body = new ArrayBuffer(pdf.byteLength);
   new Uint8Array(body).set(pdf);
+
+  await sendLeadNotification({
+    name,
+    email: stored?.lead?.email,
+    phone: stored?.lead?.phone,
+    city: stored?.lead?.city ?? undefined,
+    number: stored?.number,
+    low,
+    mid,
+    high,
+    pdf
+  }).catch(() => undefined);
 
   return new Response(body, {
     headers: {

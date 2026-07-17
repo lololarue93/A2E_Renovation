@@ -1,7 +1,9 @@
 import type { LeadPayload } from "@/lib/validators/lead.schema";
+import { getNotificationSettings } from "@/lib/settings/notification-settings";
 
 export async function sendTelegramLead(lead: LeadPayload, adminUrl?: string) {
-  if (process.env.TELEGRAM_LEADS_ENABLED !== "true" || !process.env.TELEGRAM_BOT_TOKEN || !process.env.TELEGRAM_CHAT_ID) {
+  const settings = await getNotificationSettings();
+  if (!settings.telegramEnabled || process.env.TELEGRAM_LEADS_ENABLED !== "true" || !process.env.TELEGRAM_BOT_TOKEN || !process.env.TELEGRAM_CHAT_ID) {
     console.info("Telegram not configured");
     return { sent: false, reason: "not_configured" };
   }

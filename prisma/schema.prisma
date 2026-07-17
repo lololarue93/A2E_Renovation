@@ -126,6 +126,7 @@ model Realisation {
   tags        String[]
   active      Boolean            @default(true)
   photos      RealisationPhoto[]
+  media       MediaAsset[]
   createdAt   DateTime           @default(now())
 }
 
@@ -136,6 +137,19 @@ model RealisationPhoto {
   beforeUrl     String?
   afterUrl      String?
   sortOrder     Int         @default(0)
+}
+
+model MediaAsset {
+  id            String      @id @default(cuid())
+  realisationId String?
+  realisation   Realisation? @relation(fields: [realisationId], references: [id], onDelete: SetNull)
+  kind          String
+  url           String
+  title         String?
+  alt           String?
+  createdAt     DateTime    @default(now())
+
+  @@index([realisationId, createdAt])
 }
 
 model Employee {

@@ -7,16 +7,36 @@ import { AnalyticsTracker } from "@/components/analytics/AnalyticsTracker";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://a2e-renovation.local"),
+  applicationName: "A2E Renovation",
+  verification: process.env.GOOGLE_SITE_VERIFICATION ? { google: process.env.GOOGLE_SITE_VERIFICATION } : undefined,
+  icons: {
+    icon: [{ url: "/branding/a2e-logo.jpeg", type: "image/jpeg" }],
+    shortcut: "/branding/a2e-logo.jpeg",
+    apple: [{ url: "/branding/a2e-logo.jpeg", type: "image/jpeg" }]
+  },
   title: {
     default: "A2E Rénovation | Rénovation énergétique, fenêtres & isolation",
     template: "%s | A2E Rénovation"
   },
-  description: siteSettings.description,
+  description: "Fenêtres, isolation, plomberie, électricité et rénovation globale en Île-de-France. Obtenez une première fourchette claire en quelques minutes.",
   openGraph: {
     title: "A2E Rénovation",
-    description: siteSettings.description,
+    description: "Une estimation lisible, des postes détaillés et un accompagnement humain pour vos travaux en Île-de-France.",
     type: "website",
     locale: "fr_FR",
+    siteName: "A2E Renovation",
+    url: "/",
+    images: [{
+      url: "/branding/a2e-exterior-premium.jpeg",
+      width: 1440,
+      height: 1080,
+      alt: "Projet de rénovation extérieure A2E Renovation"
+    }]
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "A2E Renovation | Estimez vos travaux",
+    description: "Une première fourchette claire avant votre rendez-vous technique.",
     images: ["/branding/a2e-exterior-premium.jpeg"]
   }
 };
