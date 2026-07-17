@@ -23,7 +23,7 @@ export const siteSettings = {
   email: "contact@ags-a2e.com",
   executiveEmail: "julien.c@ags-a2e.com",
   social: "A2Erenovation",
-  city: "Sevran",
+  city: "Ile-de-France",
   region: "Île-de-France",
   tagline: "Fenêtres, isolation & rénovation intérieure : estimez votre projet en ligne",
   description:
@@ -115,7 +115,7 @@ export const reasons = [
 ];
 
 export const realisations = [
-  { title: "Remplacement fenêtres PVC maison", city: "Sevran", type: "Fenêtres", duration: "2 jours", budget: "8 000 à 14 000 EUR", tags: ["PVC", "Double vitrage", "Confort thermique"] },
+  { title: "Remplacement fenêtres PVC maison", city: "Seine-Saint-Denis", type: "Fenêtres", duration: "2 jours", budget: "8 000 à 14 000 EUR", tags: ["PVC", "Double vitrage", "Confort thermique"] },
   { title: "Fenêtres aluminium + baie vitrée", city: "Aulnay-sous-Bois", type: "Menuiseries", duration: "3 jours", budget: "12 000 à 22 000 EUR", tags: ["Aluminium", "Baie coulissante", "Lumière"] },
   { title: "ITE façade avant/après", city: "Seine-Saint-Denis", type: "Isolation", duration: "3 semaines", budget: "28 000 à 48 000 EUR", tags: ["ITE", "Enduit", "Performance"] },
   { title: "Rénovation globale maison", city: "Île-de-France", type: "Rénovation globale", duration: "10 semaines", budget: "85 000 à 140 000 EUR", tags: ["TCE", "Isolation", "Chauffage"] },

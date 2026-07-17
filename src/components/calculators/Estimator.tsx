@@ -22,7 +22,7 @@ const newElectrical = (): ElectricalItem => ({ kind: "socket", quantity: 1 });
 const newFixture = (): PlumbingFixture => ({ kind: "shower", quantity: 1 });
 
 export function Estimator() {
-  const [input, setInput] = useState<EstimateInput>({ projectType: "windows", city: "Sevran", postalCode: "93270", surface: 80, material: "pvc", finish: "standard", urgency: "normal", access: "simple", windowItems: [newWindow()], electricalItems: [newElectrical()], plumbingFixtures: [newFixture()], includePanel: true, energy: { energyType: "electricity", currentDpe: "unknown", insulation: "unknown", household: 2, solar: false } });
+  const [input, setInput] = useState<EstimateInput>({ projectType: "windows", city: "Ile-de-France", postalCode: "", surface: 80, material: "pvc", finish: "standard", urgency: "normal", access: "simple", windowItems: [newWindow()], electricalItems: [newElectrical()], plumbingFixtures: [newFixture()], includePanel: true, energy: { energyType: "electricity", currentDpe: "unknown", insulation: "unknown", household: 2, solar: false } });
   useEffect(() => { fetch("/api/pricing").then((response) => response.json()).then((items: PriceItem[]) => { if (items.length) priceItems.splice(0, priceItems.length, ...items); }).catch(() => undefined); }, []);
   const result = useMemo(() => estimateProject(input), [input]);
 

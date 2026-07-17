@@ -7,7 +7,17 @@ export function localBusinessSchema() {
     name: siteSettings.company,
     telephone: siteSettings.phone,
     email: siteSettings.email,
-    areaServed: ["Sevran", "Seine-Saint-Denis", "Île-de-France"],
-    serviceType: ["Rénovation énergétique", "Remplacement de fenêtres", "Isolation", "Rénovation globale"]
+    areaServed: [
+      "Ile-de-France",
+      "Paris (75)",
+      "Seine-et-Marne (77)",
+      "Yvelines (78)",
+      "Essonne (91)",
+      "Hauts-de-Seine (92)",
+      "Seine-Saint-Denis (93)",
+      "Val-de-Marne (94)",
+      "Val-d'Oise (95)"
+    ],
+    serviceType: ["Renovation energetique", "Remplacement de fenetres", "Isolation", "Renovation globale"]
   };
 }
