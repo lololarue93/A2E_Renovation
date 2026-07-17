@@ -26,5 +26,6 @@ export async function GET(request: NextRequest) {
   for (const lead of leads.slice(0, 12)) { if (y < 80) break; page.drawText(`${lead.name} - ${lead.typeProjet} - ${lead.status}`, { x: 50, y, size: 8.5, font, color: navy }); page.drawText(`${lead.estimates[0]?.mid ?? lead.budget ?? 0} EUR`, { x: 430, y, size: 8.5, font: bold, color: navy }); y -= 17; }
   page.drawText("Document interne - utiliser les donnees uniquement dans le cadre du consentement recueilli.", { x: 42, y: 45, size: 7.5, font, color: rgb(0.2, 0.25, 0.32) });
   const bytes = await pdf.save();
-  return new Response(bytes, { headers: { "content-type": "application/pdf", "content-disposition": "attachment; filename=a2e-rapport-leads.pdf" } });
+  const body = new Blob([bytes.buffer as ArrayBuffer], { type: "application/pdf" });
+  return new Response(body, { headers: { "content-type": "application/pdf", "content-disposition": "attachment; filename=a2e-rapport-leads.pdf" } });
 }

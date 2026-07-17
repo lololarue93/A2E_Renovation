@@ -1,8 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    typedRoutes: false
-  },
+  typedRoutes: false,
   images: {
     formats: ["image/avif", "image/webp"]
   }
