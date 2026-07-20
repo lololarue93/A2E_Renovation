@@ -4,7 +4,7 @@ import { realisations as demoRealisations } from "@/lib/site-data";
 
 export async function GET() {
   const items = await prisma.realisation.findMany({ orderBy: { createdAt: "desc" } }).catch(() => []);
-  const fallback = demoRealisations.map((item, index) => ({ id: `demo-realisation-${index}`, ...item, active: true }));
+  const fallback = demoRealisations.map((item, index) => ({ id: `demo-realisation-${index}`, ...item, description: `${item.title} - projet de demonstration A2E.`, active: true }));
   return NextResponse.json({ realisations: fallback.map((item) => items.find((databaseItem) => databaseItem.id === item.id) ?? item).concat(items.filter((item) => !item.id.startsWith("demo-realisation-"))) });
 }
 
@@ -12,7 +12,8 @@ export async function PUT(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const id = typeof body.id === "string" ? body.id : "";
   const source = id.match(/^demo-realisation-(\d+)$/)?.[1];
-  const fallback = source && demoRealisations[Number(source)] ? demoRealisations[Number(source)] : demoRealisations[0];
+  const fallbackSource = source && demoRealisations[Number(source)] ? demoRealisations[Number(source)] : demoRealisations[0];
+  const fallback = { ...fallbackSource, description: `${fallbackSource.title} - projet de demonstration A2E.` };
   if (!id || !fallback) return NextResponse.json({ ok: false, error: "Realisation invalide" }, { status: 400 });
   const text = (value: unknown, defaultValue: string, max = 500) => typeof value === "string" && value.trim() ? value.trim().slice(0, max) : defaultValue;
   const tags = Array.isArray(body.tags) ? body.tags.filter((tag: unknown): tag is string => typeof tag === "string").map((tag: string) => tag.trim()).filter(Boolean).slice(0, 8) : fallback.tags;
