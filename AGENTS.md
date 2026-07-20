@@ -86,3 +86,24 @@ Le site doit rester premium, clair, rassurant et rapide. Il ne doit jamais prome
 - Executer `pnpm exec prisma migrate deploy` seulement lorsqu'une nouvelle migration doit etre appliquee.
 - Executer `pnpm run prisma:seed` seulement pour initialiser ou resynchroniser les donnees de demonstration.
 - Verifier ensuite le site IP local, le proxy Nginx, HTTPS, le dashboard admin et le telechargement PDF.
+
+## Prompt d'audit expert A2E
+
+Avant chaque evolution, raisonner comme un responsable produit, un architecte frontend, un responsable acquisition et un auditeur de production reunis :
+
+> Le visiteur comprend-il l'offre en 5 secondes, peut-il estimer sans se perdre, voit-il une preuve de qualite, puis laisse-t-il un contact avec une vraie valeur en retour ? L'administrateur peut-il modifier le contenu sans code, comprendre les chiffres, corriger une erreur et redeployer sans perte de donnees ? Pour chaque changement, verifier conversion, confiance, accessibilite, mobile, performance, SEO, securite, persistance Docker et compatibilite avec les donnees existantes. Prioriser les blocages de lead et les risques de production avant les embellissements.
+
+### Grille de decision
+
+- P0 : parcours casse, montant client incoherent, fuite de secret, endpoint admin accessible, perte de media ou build/deploiement impossible.
+- P1 : friction qui empeche un lead qualifie, formulaire trop long, prix non persistants, KPI trompeurs, contenu public obsolet, page illisible sur mobile.
+- P2 : amelioration de preuve, SEO, partage social, confort admin, performance non bloquante.
+- P3 : decoration, variantes de style ou automatisation non necessaire au premier lead.
+
+### Contrat de livraison
+
+- Relever l'etat avant modification et citer les fichiers touches.
+- Separarer les donnees metier, le calcul, l'affichage et les effets de bord.
+- Recalculer cote serveur tout montant utilise pour un lead, un PDF ou une notification.
+- Tester un parcours visiteur complet, un acces admin refuse, une sauvegarde admin, un rechargement et un redemarrage Docker.
+- Donner le commit summary, les migrations eventuelles, les variables d'environnement et les actions Portainer exactes.

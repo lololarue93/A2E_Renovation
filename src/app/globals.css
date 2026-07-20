@@ -35,7 +35,8 @@ a {
 h1,
 h2,
 h3 {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: Aptos, "Segoe UI", sans-serif;
+  letter-spacing: 0;
 }
 
 button,

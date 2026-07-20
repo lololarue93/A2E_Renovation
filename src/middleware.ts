@@ -11,14 +11,15 @@ export function middleware(request: NextRequest) {
   const authorization = request.headers.get("authorization");
 
   if (authorization?.startsWith("Basic ")) {
-    const encoded = authorization.slice("Basic ".length);
-    const decoded = atob(encoded);
-    const separatorIndex = decoded.indexOf(":");
-    const email = decoded.slice(0, separatorIndex);
-    const password = decoded.slice(separatorIndex + 1);
-
-    if (email === expectedEmail && password === expectedPassword) {
-      return NextResponse.next();
+    try {
+      const encoded = authorization.slice("Basic ".length);
+      const decoded = atob(encoded);
+      const separatorIndex = decoded.indexOf(":");
+      const email = separatorIndex >= 0 ? decoded.slice(0, separatorIndex) : "";
+      const password = separatorIndex >= 0 ? decoded.slice(separatorIndex + 1) : "";
+      if (email === expectedEmail && password === expectedPassword) return NextResponse.next();
+    } catch {
+      // A malformed Authorization header must remain a normal 401, never a 500.
     }
   }
 

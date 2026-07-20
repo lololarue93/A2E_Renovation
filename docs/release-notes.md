@@ -2,6 +2,28 @@
 
 Ce document est mis a jour a chaque livraison. La section la plus recente doit etre reprise dans le message client, puis completee avec le lien de version et la date de mise en ligne.
 
+## Version en preparation - Accroche, fiabilite et securite
+
+### Ajustements visibles
+
+- Page d'accueil allegee : accroche, acces rapides par expertise et calculette express.
+- Simulateur complet conserve sur sa page dediee pour composer un dossier plus precis.
+- Titres modernises avec une typographie sans-serif plus contemporaine.
+- Libelles de realisations de demonstration harmonises sur l'ile-de-France.
+
+### Fiabilite et production
+
+- Les montants du lead et du PDF sont recalcules cote serveur a partir des choix transmis.
+- Les requetes JSON invalides ou trop volumineuses sont refusees proprement.
+- Un en-tete d'autorisation Basic malforme ne provoque plus d'erreur serveur.
+- Ajout d'en-tetes HTTP de protection de base pour la production.
+
+### Audit expert a poursuivre
+
+- Verifier le parcours multi-postes dans le simulateur complet, notamment ITE + fenetres.
+- Televerser au moins une photo et une video depuis l'admin pour alimenter la galerie publique.
+- Confirmer la persistance des prix, des medias et des leads apres redemarrage Docker.
+
 ## Version en preparation - Medias et realisations
 
 ### Nouveautes visibles pour le client
