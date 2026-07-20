@@ -27,6 +27,7 @@ export type EnergyInput = {
 
 export type EstimateInput = {
   projectType: ProjectType;
+  projectTypes?: ProjectType[];
   city?: string;
   postalCode?: string;
   surface?: number;
@@ -107,16 +108,16 @@ function windowLines(input: EstimateInput) {
   return lines;
 }
 
-function buildLines(input: EstimateInput): EstimateLine[] {
-  if (input.projectType === "windows") return windowLines(input);
-  if (input.projectType === "insulation") {
+function buildLinesForType(input: EstimateInput, projectType: ProjectType): EstimateLine[] {
+  if (projectType === "windows") return windowLines(input);
+  if (projectType === "insulation") {
     const quantity = Math.max(20, input.surface ?? 80);
     const key = input.insulationFinish === "cladding" ? "ite_cladding" : input.insulationFinish === "unknown" ? "inside_wall" : "ite_pse";
     const lines = [lineFromItem(key, quantity, undefined, input.insulationThickness && input.insulationThickness > 140 ? 1.12 : 1)];
     if (input.insulationFinish !== "unknown") lines.push(lineFromItem("scaffold_simple", quantity));
     return lines;
   }
-  if (input.projectType === "electricity") {
+  if (projectType === "electricity") {
     const surface = Math.max(20, input.surface ?? 80);
     const lines = [lineFromItem(input.electricalScope === "partial" ? "electric_partial" : "electric_full", surface)];
     if (input.includePanel) lines.push(lineFromItem("electric_panel"));
@@ -127,18 +128,18 @@ function buildLines(input: EstimateInput): EstimateLine[] {
     }
     return lines;
   }
-  if (input.projectType === "plumbing") {
+  if (projectType === "plumbing") {
     const fixtures = input.plumbingFixtures ?? [{ kind: "water_point", quantity: Math.max(1, input.plumbingPoints ?? 1) }];
     const lines = fixtures.map((fixture) => fixture.kind === "water_point" ? lineFromItem("plumbing_point", fixture.quantity) : lineFromItem(`plumbing_${fixture.kind}`, fixture.quantity));
     lines.push(lineFromItem("plumbing_distribution"));
     if (input.includeWaterHeaterConnection) lines.push(lineFromItem("water_heater_connection"));
     return lines;
   }
-  if (input.projectType === "global") {
+  if (projectType === "global") {
     const key = input.globalLevel === "full" ? "global_full" : input.globalLevel === "light" ? "global_light" : "global_medium";
     return [lineFromItem(key, Math.max(20, input.surface ?? 90)), lineFromItem("coordination")];
   }
-  if (input.projectType === "hvac") {
+  if (projectType === "hvac") {
     if (input.hvacType === "pac") {
       const annual = input.energy?.annualConsumption ?? 0;
       const surface = input.surface ?? 80;
@@ -147,12 +148,17 @@ function buildLines(input: EstimateInput): EstimateLine[] {
     }
     return [lineFromItem(input.hvacType ?? "vmc_hygro")];
   }
-  if (input.projectType === "roofing") return [lineFromItem(input.globalLevel === "full" ? "roof_renovation" : "roof_repair", Math.max(10, input.surface ?? 60)), ...(input.access === "difficult" ? [lineFromItem("framework_repair")] : [])];
-  return [lineFromItem(input.projectType === "kitchen_bath" ? "bathroom" : "global_light", Math.max(input.projectType === "kitchen_bath" ? 4 : 10, input.surface ?? (input.projectType === "kitchen_bath" ? 7 : 20)))];
+  if (projectType === "roofing") return [lineFromItem(input.globalLevel === "full" ? "roof_renovation" : "roof_repair", Math.max(10, input.surface ?? 60)), ...(input.access === "difficult" ? [lineFromItem("framework_repair")] : [])];
+  return [lineFromItem(projectType === "kitchen_bath" ? "bathroom" : "global_light", Math.max(projectType === "kitchen_bath" ? 4 : 10, input.surface ?? (projectType === "kitchen_bath" ? 7 : 20)))];
+}
+
+function buildLines(input: EstimateInput): EstimateLine[] {
+  const types = [...new Set(input.projectTypes?.length ? input.projectTypes : [input.projectType])];
+  return types.flatMap((type) => buildLinesForType(input, type));
 }
 
 function energyStudy(input: EstimateInput, mid: number) {
-  if (input.projectType !== "global" && !input.energy?.annualConsumption) return undefined;
+  if (!input.projectTypes?.includes("global") && input.projectType !== "global" && !input.energy?.annualConsumption) return undefined;
   const energy = input.energy ?? {};
   const unitCost = energy.energyType === "gas" ? 0.11 : energy.energyType === "fuel" ? 0.14 : 0.25;
   const currentAnnualCost = (energy.annualConsumption ?? 0) * unitCost;
@@ -164,6 +170,7 @@ function energyStudy(input: EstimateInput, mid: number) {
 }
 
 export function estimateProject(input: EstimateInput): EstimateResult {
+  const projectTypes = [...new Set(input.projectTypes?.length ? input.projectTypes : [input.projectType])];
   const lines = buildLines(input);
   const coefficient = regionCoefficient(input.city, input.postalCode) * pricingCoefficients.access[input.access ?? "simple"] * pricingCoefficients.urgency[input.urgency];
   const totals = lines.reduce((acc, line) => ({ low: acc.low + line.low, mid: acc.mid + line.mid, high: acc.high + line.high }), { low: 0, mid: 0, high: 0 });
@@ -173,10 +180,10 @@ export function estimateProject(input: EstimateInput): EstimateResult {
   const energy = energyStudy(input, mid);
   const maturityScore = Math.min(100, 35 + (input.city ? 10 : 0) + (input.surface || input.quantity || input.windowItems?.length ? 15 : 0) + (input.urgency !== "info" ? 15 : 0) + (input.projectType !== "other" ? 15 : 0) + (input.projectType === "global" && input.energy?.annualConsumption ? 10 : 0));
   const durationMap: Record<ProjectType, string> = { windows: "1 a 8 jours selon les ouvrants", insulation: "2 a 5 semaines", electricity: "3 jours a 3 semaines", plumbing: "1 a 10 jours", global: "6 a 16 semaines", hvac: "1 a 5 jours", kitchen_bath: "2 a 5 semaines", roofing: "2 jours a 4 semaines", other: "A preciser apres echange" };
-  const roadmap: string[] = input.projectType === "global" ? ["Releve logement et analyse des consommations", "Priorisation isolation, ventilation et chauffage", "Chiffrage des variantes et verification technique", "Planning des lots et suivi des consommations"] : ["Validation des quantites et des supports", "Choix des materiels ou equivalents", "Visite technique et devis detaille", "Planification puis suivi de chantier"];
+  const roadmap: string[] = projectTypes.includes("global") ? ["Releve logement et analyse des consommations", "Priorisation isolation, ventilation et chauffage", "Chiffrage des variantes et verification technique", "Planning des lots et suivi des consommations"] : ["Validation des quantites et des supports", "Choix des materiels ou equivalents", "Visite technique et devis detaille", "Planification puis suivi de chantier"];
   return {
-    low, mid, high, duration: durationMap[input.projectType], complexity: coefficient > 1.45 || input.projectType === "global" ? "complexe" : coefficient > 1.15 ? "standard" : "simple", maturityScore, lines,
-    tvaRate: input.projectType === "windows" || input.projectType === "insulation" || input.projectType === "hvac" ? 5.5 : 10,
+    low, mid, high, duration: projectTypes.map((type) => durationMap[type]).join(" + "), complexity: coefficient > 1.45 || projectTypes.includes("global") || projectTypes.length > 2 ? "complexe" : coefficient > 1.15 ? "standard" : "simple", maturityScore, lines,
+    tvaRate: projectTypes.every((type) => type === "windows" || type === "insulation" || type === "hvac") ? 5.5 : 10,
     offers: [
       { name: "Essentiel", price: low, summary: "Le périmètre demandé, dimensionné sur les quantités saisies.", included: ["Fourniture et pose selon configuration", "Hypothèses visibles", "Validation technique"] },
       { name: "Confort", price: mid, summary: "Le scénario équilibré avec les protections et adaptations utiles.", included: ["Tout le périmètre Essentiel", "Options et reprises principales", "Planning prévisionnel"] },
