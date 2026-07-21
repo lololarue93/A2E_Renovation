@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { RealisationsPreview } from "@/components/marketing/RealisationsPreview";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 import { SectionHeading } from "@/components/marketing/SectionHeading";
 
 export const metadata: Metadata = {

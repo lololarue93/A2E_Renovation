@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
     low,
     mid,
     high,
-    pdf
+    pdf,
+    event: "pdfGenerated"
   }).catch(() => undefined);
 
   return new Response(body, {

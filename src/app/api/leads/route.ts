@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { estimateProject, type EstimateInput } from "@/lib/pricing/estimate-engine";
 import { emitWebhook } from "@/lib/webhooks/emit-webhook";
 import { sendTelegramLead } from "@/lib/webhooks/send-telegram-lead";
+import { sendLeadNotification } from "@/lib/email/send-lead-notification";
 
 export async function POST(request: NextRequest) {
   const contentLength = Number(request.headers.get("content-length") ?? 0);
@@ -67,6 +68,7 @@ export async function POST(request: NextRequest) {
               high: line.high
               ,reference: line.reference
               ,description: line.description
+              ,vatRate: line.vatRate
             }))
           }
         }
@@ -87,6 +89,7 @@ export async function POST(request: NextRequest) {
   });
 
   await sendTelegramLead({ ...lead, result: serverResult }, `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/admin?lead=${savedLead.id}`);
+  await sendLeadNotification({ name: lead.name, email: lead.email, phone: lead.phone, city: input.city, number: estimateNumber, low: serverResult.low, mid: serverResult.mid, high: serverResult.high, event: "leadCreated" }).catch(() => undefined);
 
   await prisma.siteEvent.create({
     data: {

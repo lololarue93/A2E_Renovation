@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
@@ -32,6 +32,9 @@ export async function POST(request: NextRequest) {
   if (demoIndex && demoRealisations[Number(demoIndex)]) {
     const demo = demoRealisations[Number(demoIndex)];
     await prisma.realisation.upsert({ where: { id: requestedRealisationId }, update: {}, create: { id: requestedRealisationId, ...demo, description: `${demo.title} - projet gere depuis la bibliotheque media.` } });
+  } else if (requestedRealisationId) {
+    const existing = await prisma.realisation.findUnique({ where: { id: requestedRealisationId }, select: { id: true } });
+    if (!existing) return NextResponse.json({ ok: false, error: "Realisation introuvable" }, { status: 400 });
   }
   const asset = await prisma.mediaAsset.create({ data: { kind: file.type.startsWith("video/") ? "video" : "image", url: `/uploads/realisations/${filename}`, title: typeof form.get("title") === "string" && form.get("title") ? String(form.get("title")) : file.name, alt: typeof form.get("alt") === "string" && form.get("alt") ? String(form.get("alt")) : file.name, realisationId: requestedRealisationId || undefined } });
   await prisma.auditLog.create({ data: { actor: "admin", action: "media.uploaded", entity: "MediaAsset", entityId: asset.id, payload: { kind: asset.kind, url: asset.url } } }).catch(() => undefined);
@@ -52,5 +55,7 @@ export async function DELETE(request: NextRequest) {
   if (!id) return NextResponse.json({ ok: false, error: "Media introuvable" }, { status: 400 });
   const asset = await prisma.mediaAsset.delete({ where: { id } }).catch(() => null);
   if (!asset) return NextResponse.json({ ok: false, error: "Media introuvable" }, { status: 404 });
+  if (asset.url.startsWith("/uploads/")) await unlink(join(process.cwd(), "public", asset.url.replace(/^\/+/, ""))).catch(() => undefined);
+  await prisma.auditLog.create({ data: { actor: "admin", action: "media.deleted", entity: "MediaAsset", entityId: asset.id, payload: { url: asset.url } } }).catch(() => undefined);
   return NextResponse.json({ ok: true });
 }

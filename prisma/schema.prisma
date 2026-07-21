@@ -104,6 +104,9 @@ model PriceItem {
   low       Int
   mid       Int
   high      Int
+  reference String?
+  description String?
+  vatRate   Float    @default(10)
   active    Boolean  @default(true)
   updatedAt DateTime @updatedAt
 }

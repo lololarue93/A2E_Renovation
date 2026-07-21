@@ -11,6 +11,7 @@ export type PdfEstimateLine = {
   high: number;
   reference?: string | null;
   description?: string | null;
+  vatRate?: number | null;
 };
 
 export type EstimatePdfInput = {
@@ -115,7 +116,7 @@ export async function generateEstimatePdf(input: EstimatePdfInput) {
   y -= 38;
 
   for (const line of input.lines ?? []) {
-    const detail = [line.description, line.reference ? `Reference indicative : ${line.reference}` : null].filter(Boolean).join(" | ");
+    const detail = [line.description ? `Contenu du pack : ${line.description}` : null, line.reference ? `Reference indicative : ${line.reference}` : null, line.vatRate ? `TVA indicative : ${line.vatRate} %` : null].filter(Boolean).join(" | ");
     const labelLines = wrap(line.label, 42);
     const detailLines = detail ? wrap(`- ${detail}`, 50) : [];
     const contentLines = [...labelLines, ...detailLines];

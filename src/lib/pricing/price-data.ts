@@ -10,6 +10,7 @@ export type PriceItem = {
   high: number;
   reference?: string;
   description?: string;
+  vatRate?: number;
 };
 
 // Base public demo prices: standard supply + installation assumptions, before the regional/access coefficient.

@@ -22,6 +22,7 @@ export const leadSchema = z.object({
       high: z.number()
       ,reference: z.string().optional()
       ,description: z.string().optional()
+      ,vatRate: z.number().optional()
     })).default([]),
     assumptions: z.array(z.string()).default([])
   })

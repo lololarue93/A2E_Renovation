@@ -55,9 +55,10 @@ export type EstimateInput = {
   access?: "simple" | "medium" | "difficult";
   shutters?: boolean;
   acoustic?: boolean;
+  customItems?: Array<{ key: string; quantity: number }>;
 };
 
-export type EstimateLine = { label: string; quantity: number; unit: string; low: number; mid: number; high: number; reference?: string; description?: string };
+export type EstimateLine = { label: string; quantity: number; unit: string; low: number; mid: number; high: number; reference?: string; description?: string; vatRate?: number };
 export type EstimateOffer = { name: string; price: number; summary: string; included: string[] };
 export type EstimateResult = {
   low: number;
@@ -87,7 +88,8 @@ function regionCoefficient(city?: string, postalCode?: string) {
 function lineFromItem(key: string, quantity = 1, label?: string, multiplier = 1): EstimateLine {
   const item = findItem(key);
   const displayLabel = label ?? item.label;
-  return { label: item.reference ? `${displayLabel} - ${item.reference}` : displayLabel, quantity, unit: item.unit, low: item.low * quantity * multiplier, mid: item.mid * quantity * multiplier, high: item.high * quantity * multiplier, reference: item.reference, description: item.description };
+  const categoryDescription = item.category === "windows" ? "Gamme basse : PVC blanc et double vitrage standard. Gamme centrale : ouvrant renforcé, finitions et réglages adaptés. Gamme haute : profilés, vitrage et accessoires renforcés selon le projet." : item.category === "insulation" ? "Gamme basse : isolant et finition standard. Gamme centrale : épaisseur et traitement des points singuliers. Gamme haute : finition renforcée, performances et adaptations de façade." : item.category === "hvac" ? "Gamme basse : équipement dimensionné sur besoin simple. Gamme centrale : régulation, raccordements et mise en service. Gamme haute : dimensionnement renforcé et contraintes techniques complémentaires." : "Gamme basse : fourniture et mise en œuvre standard. Gamme centrale : adaptations, réglages et contrôles usuels. Gamme haute : finitions, contraintes d'accès et matériel renforcé.";
+  return { label: item.reference ? `${displayLabel} - ${item.reference}` : displayLabel, quantity, unit: item.unit, low: item.low * quantity * multiplier, mid: item.mid * quantity * multiplier, high: item.high * quantity * multiplier, reference: item.reference ?? "Matériel ou équivalent à valider lors de la visite technique", description: item.description ?? categoryDescription, vatRate: item.vatRate ?? (item.category === "windows" || item.category === "insulation" || item.category === "hvac" ? 5.5 : 10) };
 }
 
 function windowLines(input: EstimateInput) {
@@ -154,7 +156,11 @@ function buildLinesForType(input: EstimateInput, projectType: ProjectType): Esti
 
 function buildLines(input: EstimateInput): EstimateLine[] {
   const types = [...new Set(input.projectTypes?.length ? input.projectTypes : [input.projectType])];
-  return types.flatMap((type) => buildLinesForType(input, type));
+  const lines = types.flatMap((type) => buildLinesForType(input, type));
+  for (const custom of input.customItems ?? []) {
+    if (custom.quantity > 0 && priceItems.some((item) => item.key === custom.key)) lines.push(lineFromItem(custom.key, custom.quantity));
+  }
+  return lines;
 }
 
 function energyStudy(input: EstimateInput, mid: number) {

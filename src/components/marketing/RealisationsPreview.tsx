@@ -2,8 +2,10 @@ import Image from "next/image";
 import { ArrowUpRight, MapPin, Play } from "lucide-react";
 import { prisma } from "@/lib/db/prisma";
 import { getPublicRealisations } from "@/lib/realisations/catalog";
+import { unstable_noStore as noStore } from "next/cache";
 
 export async function RealisationsPreview({ limit = 3 }: { limit?: number }) {
+  noStore();
   const [assets, catalog] = await Promise.all([
     prisma.mediaAsset.findMany({ orderBy: { createdAt: "desc" }, take: 100 }).catch(() => []),
     getPublicRealisations()

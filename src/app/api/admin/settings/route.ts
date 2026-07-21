@@ -3,6 +3,9 @@ import { prisma } from "@/lib/db/prisma";
 import { defaultNotificationSettings, getNotificationSettings, type NotificationSettingsValue } from "@/lib/settings/notification-settings";
 import { getSiteContactSettings, type SiteContactSettings } from "@/lib/settings/site-contact-settings";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET() {
   const settings = await getNotificationSettings();
   const contact = await getSiteContactSettings();
@@ -10,6 +13,7 @@ export async function GET() {
     settings,
     contact,
     brevoConfigured: Boolean(process.env.BREVO_API_KEY && process.env.BREVO_SENDER_EMAIL),
+    smtpConfigured: Boolean(process.env.SMTP_USER && process.env.SMTP_PASSWORD),
     telegramConfigured: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID)
   });
 }
@@ -18,9 +22,21 @@ export async function PUT(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const current = await getNotificationSettings();
   const currentContact = await getSiteContactSettings();
+  const provider = ["brevo", "smtp", "ovh", "gmail"].includes(body.provider) ? body.provider : current.provider;
+  const recipients = (Array.isArray(body.recipients) ? body.recipients : String(body.recipients ?? body.leadEmail ?? "").split(/[;,\n]/))
+    .map((item: unknown) => typeof item === "string" ? item.trim().toLowerCase() : "")
+    .filter((item: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(item))
+    .slice(0, 20);
   const settings: NotificationSettingsValue = {
-    provider: body.provider === "ovh" ? "ovh" : "brevo",
+    provider,
     leadEmail: typeof body.leadEmail === "string" && body.leadEmail.includes("@") ? body.leadEmail.slice(0, 160) : current.leadEmail,
+    recipients: recipients.length ? recipients : current.recipients,
+    events: {
+      leadCreated: Boolean(body.events?.leadCreated),
+      pdfGenerated: body.events?.pdfGenerated !== false,
+      mediaUploaded: Boolean(body.events?.mediaUploaded),
+      securityAlert: body.events?.securityAlert !== false
+    },
     telegramEnabled: Boolean(body.telegramEnabled),
     trackingEnabled: body.trackingEnabled !== false,
     signatureDiscountPercent: Math.min(15, Math.max(0, Number(body.signatureDiscountPercent) || defaultNotificationSettings.signatureDiscountPercent)),
