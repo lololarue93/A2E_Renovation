@@ -13,5 +13,5 @@ export async function emitWebhook(eventName: WebhookEventName, payload: unknown)
     }
   });
 
-  console.info(`[webhook:${eventName}]`, JSON.stringify(payload).slice(0, 400));
+  console.info(`[webhook:${eventName}]`, "event stored");
 }

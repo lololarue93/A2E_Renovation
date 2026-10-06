@@ -2,54 +2,49 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { AnalyticsPreferences } from "./AnalyticsPreferences";
+import { ANALYTICS_CONSENT_EVENT, ANALYTICS_CONSENT_KEY, ANALYTICS_SESSION_KEY, clearAnalyticsSession, hasAnalyticsConsent, safeAnalyticsLabel } from "@/lib/analytics-consent";
 
-function getSessionId() {
-  const key = "a2e-session-id";
+export function getSessionId(): string | undefined {
+  if (typeof window === "undefined" || window.location.pathname.startsWith("/admin") || !hasAnalyticsConsent()) { clearAnalyticsSession(); return undefined; }
   try {
-    const current = window.sessionStorage.getItem(key);
+    const current = window.sessionStorage.getItem(ANALYTICS_SESSION_KEY);
     if (current) return current;
-  } catch {
-    // Private browsing modes can disable sessionStorage.
-  }
-  const value = typeof globalThis.crypto?.randomUUID === "function"
-    ? globalThis.crypto.randomUUID()
-    : `a2e-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
-  try {
-    window.sessionStorage.setItem(key, value);
-  } catch {
-    // Analytics must never prevent the site from rendering.
-  }
-  return value;
+    const value = typeof globalThis.crypto?.randomUUID === "function" ? globalThis.crypto.randomUUID() : `a2e-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+    window.sessionStorage.setItem(ANALYTICS_SESSION_KEY, value);
+    return value;
+  } catch { return undefined; }
 }
 
-function track(event: string, label?: string) {
+export function track(event: string, label?: string) {
+  if (typeof window === "undefined" || window.location.pathname.startsWith("/admin") || !hasAnalyticsConsent()) { clearAnalyticsSession(); return; }
+  if (!["page_view", "cta_click", "phone_click", "quote_started", "pdf_downloaded"].includes(event)) return;
   try {
-    const payload = JSON.stringify({ event, label, path: window.location.pathname, sessionId: getSessionId() });
-    if (navigator.sendBeacon) {
-      const accepted = navigator.sendBeacon("/api/analytics", new Blob([payload], { type: "application/json" }));
-      if (accepted) return;
-    }
+    const payload = JSON.stringify({ event, label: safeAnalyticsLabel(event, label), path: window.location.pathname, sessionId: getSessionId(), analyticsConsent: true });
+    if (navigator.sendBeacon && navigator.sendBeacon("/api/analytics", new Blob([payload], { type: "application/json" }))) return;
     void fetch("/api/analytics", { method: "POST", headers: { "content-type": "application/json" }, body: payload, keepalive: true }).catch(() => undefined);
-  } catch {
-    // Tracking is optional and must remain isolated from the user journey.
-  }
+  } catch { /* Optional measurement must not affect the public journey. */ }
 }
 
 export function AnalyticsTracker() {
   const pathname = usePathname();
-
   useEffect(() => {
-    track("page_view");
-  }, [pathname]);
-
-  useEffect(() => {
+    let listening = false;
+    let pageTracked = false;
     const onClick = (event: MouseEvent) => {
       const target = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-track]") : null;
-      if (!target) return;
-      track(target.dataset.track ?? "cta_click", target.dataset.trackLabel ?? target.textContent?.trim().slice(0, 120));
+      if (target) track(target.dataset.track ?? "cta_click", target.dataset.trackLabel);
     };
-    document.addEventListener("click", onClick, { passive: true });
-    return () => document.removeEventListener("click", onClick);
-  }, []);
-  return null;
+    const sync = () => {
+      const permitted = !pathname.startsWith("/admin") && hasAnalyticsConsent();
+      if (permitted && !listening) { document.addEventListener("click", onClick, { passive: true }); listening = true; }
+      if (!permitted) { if (listening) document.removeEventListener("click", onClick); listening = false; pageTracked = false; clearAnalyticsSession(); }
+      else if (!pageTracked) { pageTracked = true; track("page_view"); }
+    };
+    const storage = (event: StorageEvent) => { if (event.key === ANALYTICS_CONSENT_KEY || event.key === null) sync(); };
+    sync(); window.addEventListener(ANALYTICS_CONSENT_EVENT, sync); window.addEventListener("storage", storage);
+    const expiryCheck = window.setInterval(sync, 60000);
+    return () => { document.removeEventListener("click", onClick); window.removeEventListener(ANALYTICS_CONSENT_EVENT, sync); window.removeEventListener("storage", storage); window.clearInterval(expiryCheck); };
+  }, [pathname]);
+  return <AnalyticsPreferences />;
 }

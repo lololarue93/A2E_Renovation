@@ -1,27 +1,56 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
+import { requireAdmin } from "@/lib/auth/require-admin";
 import { realisations as demoRealisations } from "@/lib/site-data";
 
-export async function GET() {
-  const items = await prisma.realisation.findMany({ orderBy: { createdAt: "desc" } }).catch(() => []);
-  const fallback = demoRealisations.map((item, index) => ({ id: `demo-realisation-${index}`, ...item, description: `${item.title} - projet de demonstration A2E.`, active: true }));
-  return NextResponse.json({ realisations: fallback.map((item) => items.find((databaseItem) => databaseItem.id === item.id) ?? item).concat(items.filter((item) => !item.id.startsWith("demo-realisation-"))) });
+export const dynamic = "force-dynamic";
+const fields = z.object({
+  title: z.string().trim().min(3).max(160), city: z.string().trim().min(2).max(120),
+  type: z.string().trim().min(2).max(120), description: z.string().trim().min(10).max(2000),
+  duration: z.string().trim().max(80), budget: z.string().trim().max(120),
+  tags: z.array(z.string().trim().min(1).max(50)).max(8), active: z.boolean()
+});
+
+export async function GET(request: NextRequest) {
+  const denied = requireAdmin(request); if (denied) return denied;
+  try {
+    const items = await prisma.realisation.findMany({ orderBy: { createdAt: "desc" } });
+    const fallback = demoRealisations.map((item, index) => ({ id: `demo-realisation-${index}`, ...item, description: `${item.title} - projet de demonstration A2E.`, active: true, isDemo: true }));
+    const catalog = [...items.map((item) => ({ ...item, isDemo: item.id.startsWith("demo-realisation-") })), ...fallback.filter((item) => !items.some((saved) => saved.id === item.id))];
+    return NextResponse.json({ realisations: catalog }, { headers: { "Cache-Control": "no-store" } });
+  } catch { return NextResponse.json({ error: "La base est indisponible. Impossible de charger les fiches." }, { status: 503 }); }
+}
+
+export async function POST(request: NextRequest) {
+  const denied = requireAdmin(request); if (denied) return denied;
+  const parsed = fields.strict().safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "Renseignez un titre, une ville, un type et une description. Verifiez la longueur des champs et des tags." }, { status: 400 });
+  try {
+    const item = await prisma.$transaction(async (tx) => {
+      const created = await tx.realisation.create({ data: parsed.data });
+      await tx.auditLog.create({ data: { actor: process.env.ADMIN_EMAIL, action: "realisation.created", entity: "Realisation", entityId: created.id, payload: { title: created.title, active: created.active } } });
+      return created;
+    });
+    return NextResponse.json({ ok: true, realisation: item }, { status: 201 });
+  } catch { return NextResponse.json({ error: "Creation impossible. La fiche n'a pas ete enregistree." }, { status: 503 }); }
 }
 
 export async function PUT(request: NextRequest) {
-  const body = await request.json().catch(() => ({}));
-  const id = typeof body.id === "string" ? body.id : "";
-  const source = id.match(/^demo-realisation-(\d+)$/)?.[1];
-  const fallbackSource = source && demoRealisations[Number(source)] ? demoRealisations[Number(source)] : demoRealisations[0];
-  const fallback = { ...fallbackSource, description: `${fallbackSource.title} - projet de demonstration A2E.` };
-  if (!id || !fallback) return NextResponse.json({ ok: false, error: "Realisation invalide" }, { status: 400 });
-  const text = (value: unknown, defaultValue: string, max = 500) => typeof value === "string" && value.trim() ? value.trim().slice(0, max) : defaultValue;
-  const tags = Array.isArray(body.tags) ? body.tags.filter((tag: unknown): tag is string => typeof tag === "string").map((tag: string) => tag.trim()).filter(Boolean).slice(0, 8) : fallback.tags;
-  const item = await prisma.realisation.upsert({
-    where: { id },
-    update: { title: text(body.title, fallback.title, 160), city: text(body.city, fallback.city, 120), type: text(body.type, fallback.type, 120), description: text(body.description, fallback.description, 800), duration: text(body.duration, fallback.duration, 80), budget: text(body.budget, fallback.budget, 120), tags, active: body.active !== false },
-    create: { id, title: text(body.title, fallback.title, 160), city: text(body.city, fallback.city, 120), type: text(body.type, fallback.type, 120), description: text(body.description, fallback.description, 800), duration: text(body.duration, fallback.duration, 80), budget: text(body.budget, fallback.budget, 120), tags, active: body.active !== false }
-  }).catch(() => null);
-  if (!item) return NextResponse.json({ ok: false, error: "Enregistrement impossible" }, { status: 503 });
-  return NextResponse.json({ ok: true, realisation: item });
+  const denied = requireAdmin(request); if (denied) return denied;
+  const parsed = fields.extend({ id: z.string().min(1).max(100) }).strict().safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "Fiche invalide. Titre, ville, type et description sont obligatoires." }, { status: 400 });
+  const { id, ...data } = parsed.data;
+  try {
+    const item = await prisma.$transaction(async (tx) => {
+      const existing = await tx.realisation.findUnique({ where: { id }, select: { id: true } });
+      const demoIndex = id.match(/^demo-realisation-(\d+)$/)?.[1];
+      if (!existing && (demoIndex === undefined || !demoRealisations[Number(demoIndex)])) return null;
+      const saved = await tx.realisation.upsert({ where: { id }, update: data, create: { id, ...data } });
+      await tx.auditLog.create({ data: { actor: process.env.ADMIN_EMAIL, action: "realisation.updated", entity: "Realisation", entityId: id, payload: { title: saved.title, active: saved.active } } });
+      return saved;
+    });
+    if (!item) return NextResponse.json({ error: "Fiche introuvable. Utilisez Nouvelle realisation pour creer un projet." }, { status: 404 });
+    return NextResponse.json({ ok: true, realisation: item });
+  } catch { return NextResponse.json({ error: "Enregistrement impossible. Les modifications n'ont pas ete confirmees." }, { status: 503 }); }
 }

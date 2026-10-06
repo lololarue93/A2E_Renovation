@@ -2,7 +2,7 @@ name: Validate
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
   pull_request:
     branches: [main]
 
@@ -33,5 +33,16 @@ jobs:
         run: pnpm list @prisma/client prisma --depth 0
       - name: Generate Prisma client
         run: pnpm exec prisma generate
+      - name: Verify calculations and protected workflows
+        run: |
+          pnpm exec tsx scripts/verify-estimates.ts
+          pnpm exec tsx scripts/verify-quotations.ts
+          pnpm exec tsx scripts/verify-admin.ts
+          pnpm exec tsx scripts/verify-admin-auth.ts
+          pnpm exec tsx scripts/verify-admin-exports.ts
+          pnpm exec tsx scripts/verify-contact.ts
+          pnpm exec tsx scripts/verify-analytics-consent.ts
+          pnpm exec tsx scripts/verify-uploads.ts
+          pnpm exec tsx scripts/verify-pdf-layout.ts
       - name: Build application
         run: pnpm run build

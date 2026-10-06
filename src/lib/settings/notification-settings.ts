@@ -20,14 +20,15 @@ export const defaultNotificationSettings: NotificationSettingsValue = {
   provider: "brevo",
   leadEmail: "julien.c@ags-a2e.com",
   recipients: ["julien.c@ags-a2e.com"],
-  events: { leadCreated: false, pdfGenerated: true, mediaUploaded: false, securityAlert: true },
+  events: { leadCreated: true, pdfGenerated: false, mediaUploaded: false, securityAlert: true },
   telegramEnabled: false,
   trackingEnabled: true,
-  signatureDiscountPercent: 5,
+  signatureDiscountPercent: 0,
   signatureWindowDays: 15
 };
 
 export async function getNotificationSettings() {
+  if (!process.env.DATABASE_URL) return defaultNotificationSettings;
   const row = await prisma.siteSettings.findUnique({ where: { key: "notifications" } }).catch(() => null);
   if (!row || !row.value || typeof row.value !== "object" || Array.isArray(row.value)) return defaultNotificationSettings;
   const value = row.value as Partial<NotificationSettingsValue>;

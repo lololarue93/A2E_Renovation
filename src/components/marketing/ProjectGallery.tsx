@@ -1,0 +1,23 @@
+"use client";
+import { useMemo, useRef, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { ArrowUpRight, ChevronLeft, ChevronRight, X, Images } from "lucide-react";
+
+export type GalleryProject = { id: string; title: string; city: string; type: string; description: string; duration: string; budget: string; tags: string[]; inspiration: boolean; assets: { url: string; alt: string; kind: string }[] };
+export function ProjectGallery({ projects }: { projects: GalleryProject[] }) {
+  const [filter, setFilter] = useState("Tout");
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<GalleryProject | null>(null);
+  const [photo, setPhoto] = useState(0);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const categories = useMemo(() => ["Tout", ...Array.from(new Set(projects.map(p => p.type)))], [projects]);
+  const shown = projects.filter(p => (filter === "Tout" || p.type === filter) && [p.title, p.city, p.type, ...p.tags].join(" ").toLowerCase().includes(query.toLowerCase()));
+  const asset = selected?.assets[photo];
+  function open(project: GalleryProject) { setSelected(project); setPhoto(0); dialog.current?.showModal(); }
+  return <div><div className="gallery-toolbar"><div className="gallery-filters" aria-label="Filtrer la galerie">{categories.map(c => <button key={c} type="button" aria-pressed={filter === c} onClick={() => setFilter(c)}>{c}</button>)}</div><label className="max-w-xs w-full"><span className="sr-only">Rechercher un projet</span><input className="input" placeholder="Un lieu, une matière, un projet…" value={query} onChange={e => setQuery(e.target.value)} /></label></div>
+    <div className="gallery-grid">{shown.map(project => <article className="gallery-card" key={project.id}><button className="gallery-image" type="button" onClick={() => open(project)} aria-label={`Ouvrir la galerie : ${project.title}`}>{project.assets[0]?.kind === "video" ? <video src={project.assets[0].url} className="h-full w-full object-cover" muted playsInline preload="metadata" /> : project.assets[0] ? <Image src={project.assets[0].url} alt={project.assets[0].alt} fill sizes="(max-width: 639px) 100vw, 50vw" className="object-cover" /> : <span className="grid h-full place-items-center"><Images size={42} strokeWidth={1} /></span>}<span className="gallery-image-label">{project.assets.length > 1 ? `${project.assets.length} visuels` : "Explorer"} <ArrowUpRight size={13} className="inline" /></span>{project.inspiration && <span className="image-caption">INSPIRATION</span>}</button><div className="gallery-meta"><span>{project.type}</span><span>{project.city}</span></div><h2>{project.title}</h2><p>{project.description}</p>{!project.inspiration && (project.duration || project.budget) && <p>{project.duration}{project.duration && project.budget ? " · " : ""}{project.budget}</p>}<Link href="/contact" className="button-text">Parlons d’un projet similaire <ArrowUpRight size={15} /></Link></article>)}</div>
+    {!shown.length && <p className="py-14 text-center text-ink/65">Aucun projet pour cette recherche. Essayez une autre expertise.</p>}
+    <dialog className="gallery-dialog" ref={dialog} onClose={() => setSelected(null)} onClick={e => { if (e.target === dialog.current) dialog.current.close(); }} aria-label={selected?.title ?? "Galerie"}><div className="gallery-dialog-header"><div><p className="text-sm font-semibold">{selected?.title}</p>{selected?.inspiration && <span className="inspiration-label">VISUEL D’INSPIRATION</span>}</div><button type="button" onClick={() => dialog.current?.close()} aria-label="Fermer la galerie"><X size={20} /></button></div>{asset?.kind === "video" ? <video src={asset.url} controls playsInline className="gallery-dialog-image" /> : asset ? <Image src={asset.url} alt={asset.alt} width={1400} height={900} className="gallery-dialog-image" /> : <p className="p-10">Les photos de ce chantier seront bientôt ajoutées.</p>}<div className="gallery-dialog-actions"><button type="button" aria-label="Visuel précédent" disabled={!selected || selected.assets.length < 2} onClick={() => setPhoto(i => (i - 1 + (selected?.assets.length ?? 1)) % (selected?.assets.length ?? 1))}><ChevronLeft size={20} /></button><span className="text-sm" aria-live="polite">{asset?.alt} {selected?.assets.length ? `· ${photo + 1} / ${selected.assets.length}` : ""}</span><button type="button" aria-label="Visuel suivant" disabled={!selected || selected.assets.length < 2} onClick={() => setPhoto(i => (i + 1) % (selected?.assets.length ?? 1))}><ChevronRight size={20} /></button></div></dialog>
+  </div>;
+}

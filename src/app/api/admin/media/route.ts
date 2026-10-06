@@ -4,21 +4,26 @@ import { join } from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { realisations as demoRealisations } from "@/lib/site-data";
+import { requireAdmin } from "@/lib/auth/require-admin";
 
 const maxBytes = 50 * 1024 * 1024;
 const allowed = new Map([["image/jpeg", "jpg"], ["image/png", "png"], ["image/webp", "webp"], ["video/mp4", "mp4"], ["video/webm", "webm"]]);
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const denied = requireAdmin(request); if (denied) return denied;
+  try {
   const [assets, dbRealisations] = await Promise.all([
-    prisma.mediaAsset.findMany({ orderBy: { createdAt: "desc" }, include: { realisation: { select: { title: true } } } }).catch(() => []),
-    prisma.realisation.findMany({ where: { active: true }, orderBy: { createdAt: "desc" }, select: { id: true, title: true } }).catch(() => [])
+    prisma.mediaAsset.findMany({ orderBy: { createdAt: "desc" }, include: { realisation: { select: { title: true } } } }),
+    prisma.realisation.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, title: true } })
   ]);
   const catalog = demoRealisations.map((item, index) => ({ id: `demo-realisation-${index}`, title: item.title }));
   const mergedRealisations = [...dbRealisations, ...catalog.filter((demo) => !dbRealisations.some((item) => item.id === demo.id))];
-  return NextResponse.json({ assets, realisations: mergedRealisations });
+  return NextResponse.json({ assets, realisations: mergedRealisations }, { headers: { "Cache-Control": "no-store" } });
+  } catch { return NextResponse.json({ error: "La bibliotheque media est indisponible. Verifiez la connexion en base." }, { status: 503 }); }
 }
 
 export async function POST(request: NextRequest) {
+  const denied = requireAdmin(request); if (denied) return denied;
   const form = await request.formData();
   const file = form.get("file");
   if (!(file instanceof File) || !allowed.has(file.type) || file.size > maxBytes) return NextResponse.json({ ok: false, error: "Format ou taille non autorise (JPEG, PNG, WebP, MP4, WebM, 50 Mo max)." }, { status: 400 });
@@ -42,6 +47,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const denied = requireAdmin(request); if (denied) return denied;
   const body = await request.json().catch(() => ({}));
   const id = typeof body.id === "string" ? body.id : "";
   if (!id) return NextResponse.json({ ok: false, error: "Media introuvable" }, { status: 400 });
@@ -51,6 +57,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const denied = requireAdmin(request); if (denied) return denied;
   const id = request.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "Media introuvable" }, { status: 400 });
   const asset = await prisma.mediaAsset.delete({ where: { id } }).catch(() => null);

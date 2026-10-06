@@ -24,3 +24,7 @@ output/
 Thumbs.db
 .vscode/
 .idea/
+
+# Local visual QA evidence (sources/scripts stay versioned)
+/docs/preview-tests/
+*.tsbuildinfo

@@ -4,6 +4,14 @@ node_modules
 .git
 .lighthouse
 output
+backups
+coverage
+playwright-report
+test-results
+public/uploads
+*.dump
+*.sql.gz
+*.tar.gz
 *.log
 *.tsbuildinfo
 .codex-*

@@ -98,15 +98,14 @@ export const services = [
 ];
 
 export const trustBadges = [
-  { label: "RGE / Qualibat", icon: BadgeCheck, note: "Badge affichable selon justificatifs confirmés" },
-  { label: "Métré & dimensions", icon: Ruler, note: "Fenêtres, surfaces et points techniques" },
-  { label: "Packs de pose", icon: ClipboardCheck, note: "Fourniture, dépose, pose, finitions" },
-  { label: "Information aides", icon: Leaf, note: "Conseil prudent, sans barème figé" },
-  { label: "Réalisations vérifiables", icon: ShieldCheck, note: "Photos, vidéos et avant / après" }
+  { label: "Prix expliqués", icon: Ruler, note: "Quantités, fournitures, options et pose à distinguer" },
+  { label: "Métré sur place", icon: Home, note: "Dimensions et contraintes à confirmer avant devis" },
+  { label: "Pose et finitions", icon: ClipboardCheck, note: "Un périmètre à préciser pour chaque poste" },
+  { label: "Aides à étudier", icon: Leaf, note: "Éligibilité et démarches à vérifier selon le projet" },
+  { label: "Documents à vérifier", icon: ShieldCheck, note: "Assurances et qualifications correspondant aux travaux" }
 ];
-
 export const reasons = [
-  "Équipe qualifiée et suivi personnalisé",
+  "Choix techniques expliqués avant engagement",
   "Postes détaillés : fenêtres, ITE, électricité, plomberie, couverture",
   "Fourchettes expliquées par matériel, pose, options et contraintes",
   "Contact humain après estimation pour affiner sur place",
@@ -124,14 +123,10 @@ export const realisations = [
 ];
 
 export const team = [
-  { name: "Julien CHARRIERE", role: "Président", bio: "Pilotage de l'entreprise, relation client et exigence de qualité sur les projets A2E.", specialties: ["Direction", "Qualité", "Relation client"] },
-  { name: "Conseiller rénovation énergétique", role: "Étude & cadrage", bio: "Analyse des besoins, orientation technique et accompagnement sur les solutions pertinentes.", specialties: ["Isolation", "Menuiseries", "Audit projet"] },
-  { name: "Conducteur de travaux", role: "Suivi chantier", bio: "Organisation des équipes, suivi du planning et coordination des lots sur le terrain.", specialties: ["Planning", "TCE", "Contrôle qualité"] },
-  { name: "Responsable administratif", role: "Relation client", bio: "Gestion des dossiers, documents, rendez-vous et suivi après premier contact.", specialties: ["Dossier", "Contact", "Suivi"] }
+  { name: siteSettings.president, role: "Direction A2E", bio: "Votre point d'entrée pour présenter le projet et identifier les interlocuteurs adaptés aux travaux.", specialties: ["Projet", "Échange", "Coordination"] }
 ];
-
 export const quickStats = [
-  { label: "Pré-devis indicatif", value: "5 min", icon: Sparkles },
+  { label: "Pré-devis indicatif", value: "À votre rythme", icon: Sparkles },
   { label: "Contact direct", value: siteSettings.phone, icon: Phone },
   { label: "Équipe projet", value: "A2E", icon: Users }
 ];

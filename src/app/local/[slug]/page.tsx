@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 
 const titles: Record<string, string> = {
   "renovation-energetique-ile-de-france": "Renovation energetique en Ile-de-France",
@@ -18,8 +19,9 @@ export function generateMetadata({ params }: { params: { slug: string } }): Meta
 }
 
 export default function LocalPage({ params }: { params: { slug: string } }) {
+  if (!titles[params.slug]) notFound();
   return (
-    <main className="section">
+    <main id="main-content" className="section">
       <div className="container max-w-3xl">
         <p className="font-black uppercase tracking-[.18em] text-champagne">Zone d'intervention</p>
         <h1 className="mt-4 text-4xl font-black text-navy">{titles[params.slug] ?? "Renovation A2E en Ile-de-France"}</h1>

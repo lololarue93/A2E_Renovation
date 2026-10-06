@@ -101,9 +101,9 @@ model PriceItem {
   category  String
   label     String
   unit      String
-  low       Int
-  mid       Int
-  high      Int
+  low       Float
+  mid       Float
+  high      Float
   reference String?
   description String?
   vatRate   Float    @default(10)

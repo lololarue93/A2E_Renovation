@@ -1,11 +1,14 @@
 import { z } from "zod";
 
+import { estimateInputSchema } from "./estimate.schema";
+
 export const leadSchema = z.object({
-  name: z.string().min(2),
-  phone: z.string().min(6),
-  email: z.string().email(),
+  name: z.string().trim().min(2).max(100),
+  phone: z.string().trim().min(6).max(30),
+  email: z.string().trim().email().max(160),
   consent: z.literal(true),
-  input: z.record(z.unknown()),
+  input: estimateInputSchema,
+  sessionId: z.string().max(80).optional(),
   result: z.object({
     low: z.number(),
     mid: z.number(),

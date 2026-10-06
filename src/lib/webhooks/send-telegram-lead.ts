@@ -26,12 +26,13 @@ export async function sendTelegramLead(lead: LeadPayload, adminUrl?: string) {
 
   const response = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: "POST",
+    signal: AbortSignal.timeout(10000),
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ chat_id: process.env.TELEGRAM_CHAT_ID, text: message })
   });
 
   if (!response.ok) {
-    console.error("Telegram lead webhook failed", await response.text());
+    console.error("Telegram lead webhook failed", response.status);
     return { sent: false, reason: "telegram_error" };
   }
 

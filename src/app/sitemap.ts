@@ -3,7 +3,7 @@ import { services } from "@/lib/site-data";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = process.env.NEXT_PUBLIC_SITE_URL ?? "https://a2e-renovation.local";
-  const paths = ["", "/simulateur", "/realisations", "/equipe", "/aides", "/contact", "/mentions-legales", "/politique-confidentialite"];
+  const paths = ["", "/services", "/tarifs", "/simulateur", "/realisations", "/equipe", "/aides", "/contact", "/mentions-legales", "/politique-confidentialite"];
   const localPages = [
     "renovation-energetique-ile-de-france",
     "remplacement-fenetres-ile-de-france",
