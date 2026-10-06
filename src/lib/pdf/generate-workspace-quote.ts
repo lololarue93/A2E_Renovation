@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { PDFDocument, StandardFonts, rgb, type PDFImage } from "pdf-lib";
 import { calculateQuote, quoteBasisLabels, type QuoteDraft } from "../pricing/quote-workspace";
+import { shortPriceUnit } from "../pricing/units";
 
 const safe = (text: string) => text.replace(/\u0153/g, "oe").replace(/\u0152/g, "OE").replace(/[^\x20-\x7e\u00a0-\u00ff]/g, " ");
 const euro = (amount: number) => `${amount.toLocaleString("fr-FR", { maximumFractionDigits: 2 }).replace(/[\u202f\u00a0]/g, " ")} EUR`;
@@ -53,7 +54,7 @@ export async function generateWorkspaceQuote(quote: QuoteDraft, phone: string) {
     y -= labels.length * 13 + 5;
     details.forEach((value) => { page.drawText(value, { x: 45, y, size: 8, font: regular, color: navy }); y -= 11; });
     const quantity = line.effectiveQuantity.toLocaleString("fr-FR", { maximumFractionDigits: 4 });
-    page.drawText(safe(`${quantity} ${line.unit}`), { x: 45, y: y - 4, size: 8, font: bold, color: navy });
+    page.drawText(safe(`${quantity} ${shortPriceUnit(line.unit)}`), { x: 45, y: y - 4, size: 8, font: bold, color: navy });
     for (const [scenarioIndex, scenario] of (["low", "mid", "high"] as const).entries()) page.drawText(`${["Bas", "Central", "Haut"][scenarioIndex]} : ${euro(line.amounts[scenario])}`, { x: 160 + scenarioIndex * 130, y: y - 4, size: 8, font: bold, color: navy });
     y -= 33;
   }

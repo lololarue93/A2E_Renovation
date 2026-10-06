@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowUpRight, FileText, Layers3, Ruler } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { Estimator } from "@/components/calculators/Estimator";
+import styles from "@/components/calculators/Estimator.module.css";
 
-export const metadata: Metadata = { title: "Estimer mes travaux", description: "Composez vos travaux poste par poste : menuiseries, isolation, électricité, plomberie. Une fourchette indicative expliquée et un pré-devis PDF avec A2E." };
+export const metadata: Metadata = { title: "Estimer mes travaux", description: "Composez vos travaux en quatre étapes : métiers, quantités, budget expliqué et pré-devis PDF. Votre projet multi-postes avec A2E en Île-de-France." };
+
 export default function SimulatorPage() {
-  return <main id="main-content"><section className="page-heading"><div className="container"><p className="eyebrow">Votre projet / Première estimation</p><h1>Vos idées.<br />Une première mesure.</h1><p>Associez plusieurs postes, précisez les quantités et comparez les options. Votre estimation évolue avec votre projet.</p><Link href="/tarifs" className="button-text">Consulter les repères de prix <ArrowUpRight size={17} /></Link></div></section><section className="border-y border-navy/10 bg-white py-6"><div className="container grid gap-5 sm:grid-cols-3">{[{ icon: Layers3, title: "Composez", text: "Un seul dossier pour plusieurs métiers." }, { icon: Ruler, title: "Ajustez", text: "Des dimensions, des matériaux, des options." }, { icon: FileText, title: "Échangez", text: "Un PDF indicatif pour préparer la visite." }].map(({ icon: Icon, title, text }) => <div className="flex gap-3" key={title}><Icon size={22} strokeWidth={1.5} className="mt-1 shrink-0 text-champagne" /><div><p className="font-semibold text-navy">{title}</p><p className="mt-1 text-sm text-ink/60">{text}</p></div></div>)}</div></section><section className="section estimate-section"><div className="container"><Estimator /><p className="mt-6 max-w-3xl text-xs leading-6 text-ink/55">Cette étude donne des prix indicatifs. Le métré, l'état des supports, l'accès et les raccordements seront confirmés avant le devis contractuel. Les aides ne sont pas déduites automatiquement.</p></div></section></main>;
+  return <main id="main-content" className={styles.page}>
+    <header className={styles.pageHeader}><div className="container"><div className={styles.pageIntro}><div><p className={styles.eyebrow}>A2E / Votre estimation</p><h1>Un budget pour vos travaux.</h1><p>Composez votre projet. Ajustez vos choix. Préparez la suite.</p></div><Link href="/tarifs">Nos repères de prix <ArrowUpRight size={16} /></Link></div></div></header>
+    <section className={styles.pageBody}><div className="container"><Estimator /><p className={styles.disclaimer}>Cette estimation prépare votre échange avec A2E. Le métré, l’état des supports, l’accès et les raccordements seront confirmés avant le devis contractuel. Les aides ne sont pas déduites automatiquement.</p></div></section>
+  </main>;
 }

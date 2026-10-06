@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" role="img" aria-labelledby="title desc">
+  <title id="title">La même pièce imaginée après projet, illustration de démonstration</title>
+  <desc id="desc">Projection fictive : murs clairs, parquet, canapé et végétation. Ce dessin ne représente pas une réalisation A2E.</desc>
+  <defs>
+    <linearGradient id="wall" x2="0" y2="1"><stop stop-color="#f3f0e5"/><stop offset="1" stop-color="#e2e0d2"/></linearGradient>
+    <linearGradient id="side" x2="1" y2="1"><stop stop-color="#e7e5d7"/><stop offset="1" stop-color="#d8ddcf"/></linearGradient>
+    <linearGradient id="floor" x2="0" y2="1"><stop stop-color="#b8a080"/><stop offset="1" stop-color="#d8c6a8"/></linearGradient>
+    <linearGradient id="glass" x2="0" y2="1"><stop stop-color="#bfd9ce"/><stop offset="1" stop-color="#e7efe1"/></linearGradient>
+  </defs>
+  <path fill="#faf8ef" d="M0 0H900L700 80H205Z"/>
+  <path fill="url(#side)" d="M0 0L205 80V425L0 600Z"/>
+  <path fill="#7e9986" d="M900 0L700 80V425L900 600Z"/>
+  <path fill="url(#wall)" d="M205 80H700V425H205Z"/>
+  <path fill="url(#floor)" d="M205 425H700L900 600H0Z"/>
+  <g stroke="#90745335" fill="none" stroke-width="1.5">
+    <path d="M0 600L310 425M115 600L345 425M230 600L380 425M345 600L415 425M460 600L450 425M575 600L485 425M690 600L520 425M805 600L555 425M900 583L590 425M900 514L625 425"/>
+    <path d="M187 441H719M157 467H748M108 510H797M46 561H856"/>
+  </g>
+  <path fill="#fefcf3" d="M414 124H606V351H414Z"/>
+  <path fill="url(#glass)" d="M425 135H595V337H425Z"/>
+  <path fill="#8faaa0" d="M425 295L459 274L488 291L520 262L559 280L595 270V337H425Z"/>
+  <path fill="#bdc8b6" d="M425 316L463 300L510 315L552 305L595 309V337H425Z"/>
+  <g stroke="#fbfaf1" stroke-width="6"><path d="M510 135V337M425 233H595"/></g>
+  <path fill="#fcfaf0" d="M405 344H615V357H405Z"/>
+  <path fill="#fff9dc" opacity=".3" d="M425 357L595 357L823 580L384 516Z"/>
+  <path stroke="#f3f0e4" stroke-width="9" d="M205 425H700"/>
+  <path stroke="#efeddf" stroke-width="5" d="M205 80H700"/>
+  <g fill="#f8f6e9" opacity=".85"><path d="M389 116H414V385L384 392Z"/><path d="M606 116H635L641 392L612 385Z"/></g>
+  <path stroke="#96977f" stroke-width="3" d="M381 113H643"/>
+  <path fill="#e4e0d1" d="M153 490L440 456L689 537L384 578Z"/>
+  <path stroke="#c7c2b2" stroke-width="2" fill="none" d="M176 492L441 467L658 536L381 564Z"/>
+  <path fill="#737f691b" d="M190 452L411 445L491 480L262 508Z"/>
+  <g>
+    <path fill="#8d9e88" d="M203 342Q203 326 221 326H378Q393 326 398 341L423 407L399 453H221L201 426Z"/>
+    <path fill="#aaba9f" d="M213 367H379L407 414H227Z"/>
+    <path fill="#93a587" d="M227 414H407V456H227Z"/>
+    <path fill="#819675" d="M200 367H225L246 405V453H219L200 428Z"/>
+    <path fill="#819675" d="M378 362H400L426 404V448H404V413Z"/>
+    <path fill="#e9e0c7" d="M231 342H268L279 371H239Z"/>
+    <path fill="#b6bba4" d="M325 342H360L375 373H337Z"/>
+    <g stroke="#65765b" stroke-width="5"><path d="M230 456V473M400 453V469"/></g>
+  </g>
+  <ellipse cx="502" cy="481" rx="69" ry="22" fill="#4e6a5a18"/>
+  <path stroke="#897557" stroke-width="7" d="M446 450V479M542 447V477M502 464V494"/>
+  <ellipse cx="494" cy="444" rx="63" ry="24" fill="#c5b594"/>
+  <ellipse cx="494" cy="439" rx="63" ry="23" fill="#ded0b1"/>
+  <path fill="#526c5b" d="M468 430L501 424L519 432L486 439Z"/>
+  <path fill="#f7f1db" d="M491 416H505V429H491Z"/>
+  <path fill="#c3aa88" d="M664 423L706 423L700 468H671Z"/>
+  <g stroke="#52735c" stroke-width="3" fill="#6b8b6e">
+    <path fill="none" d="M685 432L680 326M685 403L710 353M683 388L654 351"/>
+    <path d="M680 342Q653 325 662 304Q685 305 680 342ZM680 362Q704 333 715 341Q712 364 680 362ZM674 381Q645 372 645 346Q672 347 674 381ZM693 391Q721 365 728 377Q725 399 693 391Z"/>
+  </g>
+  <path fill="#334e4350" d="M299 156H355V227H299Z"/>
+  <path fill="#f3ecda" d="M303 160H351V223H303Z"/>
+  <path fill="#8ea690" d="M308 199L325 179L347 208H308Z"/>
+  <circle cx="338" cy="174" r="6" fill="#c5aa72"/>
+  <path stroke="#5d6b6120" fill="none" stroke-width="2" d="M205 80V425M700 80V425"/>
+</svg>

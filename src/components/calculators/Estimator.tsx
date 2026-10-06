@@ -1,99 +1,192 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { ArrowRight, Copy, FileText, Plus, Trash2 } from "lucide-react";
-import { estimateProject, type ElectricalItem, type EnergyInput, type EstimateInput, type PlumbingFixture, type WindowItem } from "@/lib/pricing/estimate-engine";
-import { type PriceItem, type ProjectType } from "@/lib/pricing/price-data";
-
-import { usePricing } from "./usePricing";
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, FileText, Flame, House, Layers3, Plus, ShieldCheck, Square, Droplets, Wrench, Zap } from "lucide-react";
+import { estimateProject, type EstimateInput, type EstimateResult } from "@/lib/pricing/estimate-engine";
+import type { ProjectType } from "@/lib/pricing/price-data";
 import { track, getSessionId } from "@/components/analytics/AnalyticsTracker";
 import { estimateInputSchema } from "@/lib/validators/estimate.schema";
-import { changeWindowKind, windowMaterialsForKind } from "@/lib/pricing/window-config";
+import { ANALYTICS_CONSENT_EVENT } from "@/lib/analytics-consent";
+import { CustomOptions, DomainFields, Field } from "./EstimatorFields";
+import { canVisitStep, estimatorSteps, initialEstimate, projectDraftKey, quickBudgetFromSearch, restoreProjectDraft, selectedProjectTypes, toggleProjectType, updateProjectDomain, validateProjectFields, type EstimatorStep } from "./estimator-flow";
+import { usePricing } from "./usePricing";
+import styles from "./Estimator.module.css";
 
-const projectLabels: Array<[ProjectType, string, string]> = [
-  ["windows", "Fenêtres et ouvrants", "Fenêtres, portes-fenêtres, baies, portes d'entrée et options."],
-  ["insulation", "Isolation / ITE", "Façade, finition, épaisseur, échafaudage et accès."],
-  ["electricity", "Électricité", "Tableau, prises, éclairages, cuisine, réseau et recharge."],
-  ["plumbing", "Plomberie", "Douches, baignoires, lavabos, WC, évier et points techniques."],
-  ["global", "Rénovation globale", "Surface, niveau, foyer, consommations, DPE et solaire."],
-  ["hvac", "PAC / VMC / chauffe-eau", "Équipement, dimensionnement et raccordements."],
-  ["kitchen_bath", "Cuisine / salle de bain", "Surface, réseaux, équipements et finitions."],
-  ["roofing", "Charpente / couverture", "Surface, accès et reprises ponctuelles."]
-];
-
-const newWindow = (): WindowItem => ({ kind: "window", quantity: 1, material: "pvc", width: 125, height: 135, opening: "french", installPack: "renovation", shutter: false });
-const newElectrical = (): ElectricalItem => ({ kind: "socket", quantity: 1 });
-const newFixture = (): PlumbingFixture => ({ kind: "shower", quantity: 1 });
+const projects = [
+  { type: "windows", title: "Fenêtres", hint: "Ouvrants, portes et volets", icon: Square },
+  { type: "insulation", title: "Isolation", hint: "Façade et murs intérieurs", icon: Layers3 },
+  { type: "electricity", title: "Électricité", hint: "Réseau et équipements", icon: Zap },
+  { type: "plumbing", title: "Plomberie", hint: "Points d’eau et sanitaires", icon: Droplets },
+  { type: "hvac", title: "Chauffage & air", hint: "PAC, ventilation, eau chaude", icon: Flame },
+  { type: "kitchen_bath", title: "Cuisine & bain", hint: "Rénover une pièce", icon: Wrench },
+  { type: "roofing", title: "Toiture", hint: "Couverture et charpente", icon: House },
+  { type: "global", title: "Projet global", hint: "Rénovation et coordination", icon: Layers3 }
+] as const;
+const stepLabels: Record<EstimatorStep, string> = { selection: "Travaux", details: "Précisions", budget: "Budget", contact: "Votre PDF" };
+const stepTitles: Record<EstimatorStep, string> = { selection: "Que souhaitez-vous rénover ?", details: "Précisons votre projet.", budget: "Votre budget, expliqué.", contact: "Gardez votre projet en PDF." };
+const stepHints: Record<EstimatorStep, string> = { selection: "Choisissez un ou plusieurs métiers. Vous pourrez revenir sur chaque choix.", details: "Un métier à la fois. Vos réglages restent disponibles à chaque retour.", budget: "Retrouvez les quantités, la pose et les options avant de demander votre dossier.", contact: "Un seul dossier pour tous vos travaux, puis un échange avec l’équipe A2E." };
+const money = (value: number) => value.toLocaleString("fr-FR") + " €";
+const titleFor = (type: ProjectType) => projects.find((project) => project.type === type)?.title ?? "Autres travaux";
 
 export function Estimator() {
-  const [input, setInput] = useState<EstimateInput>({ projectType: "windows", projectTypes: ["windows"], city: "Ile-de-France", postalCode: "", surface: 80, material: "pvc", finish: "standard", urgency: "normal", access: "simple", windowItems: [newWindow()], electricalItems: [newElectrical()], plumbingFixtures: [newFixture()], includePanel: true, energy: { energyType: "electricity", currentDpe: "unknown", insulation: "unknown", household: 2, solar: false }, customItems: [] });
-  const [status, setStatus] = useState("");
-  const { catalog, pricingError, pricingNotice } = usePricing();
-  const [busy, setBusy] = useState(false);
+  const [input, setInput] = useState<EstimateInput>(initialEstimate);
+  const [step, setStep] = useState<EstimatorStep>("selection");
+  const [furthest, setFurthest] = useState<EstimatorStep>("selection");
+  const [domain, setDomain] = useState<ProjectType>("windows");
   const [draftReady, setDraftReady] = useState(false);
+  const [draftNote, setDraftNote] = useState("Vos choix restent sur cet appareil.");
+  const [firstBudget, setFirstBudget] = useState<EstimateInput | null>(null);
+  const [resetArmed, setResetArmed] = useState(false);
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [dossier, setDossier] = useState<{ id: string; reference: string } | null>(null);
+  const [contact, setContact] = useState({ name: "", phone: "", email: "", consent: false });
+  const heading = useRef<HTMLHeadingElement>(null);
   const started = useRef<string | undefined>(undefined);
+  const { catalog, pricingError, pricingNotice } = usePricing();
+
   useEffect(() => {
-    try { const raw = localStorage.getItem("a2e-project-v2"); if (raw) { const saved = estimateInputSchema.safeParse(JSON.parse(raw)); if (saved.success) setInput({ ...saved.data, windowItems: saved.data.windowItems?.map((item) => changeWindowKind(item, item.kind)) }); } } catch {}
+    let saved: EstimateInput | null = null;
+    try { saved = restoreProjectDraft(localStorage.getItem(projectDraftKey)); } catch { setDraftNote("Le brouillon reste disponible pendant cette visite."); }
+    const quick = quickBudgetFromSearch(new URLSearchParams(window.location.search));
+    if (saved) { setInput(saved); setDomain(selectedProjectTypes(saved)[0]); setDraftNote("Votre brouillon a été retrouvé."); }
+    if (quick && saved) setFirstBudget(quick);
+    else if (quick) { setInput(quick); setDomain(quick.projectType); setStep("details"); setFurthest("details"); clearQuickSearch(); const session = getSessionId(); if (session) { track("quote_started"); started.current = session; } }
     setDraftReady(true);
   }, []);
-  useEffect(() => { if (draftReady) { try { localStorage.setItem("a2e-project-v2", JSON.stringify(input)); } catch {} } }, [input, draftReady]);
+  useEffect(() => {
+    if (!draftReady || !estimateInputSchema.safeParse(input).success) return;
+    try { localStorage.setItem(projectDraftKey, JSON.stringify(input)); }
+    catch { setDraftNote("Le brouillon reste disponible pendant cette visite."); }
+  }, [input, draftReady]);
+  useEffect(() => {
+    const viewStep = () => { if (draftReady && !firstBudget) track("quote_step_viewed", step); };
+    viewStep(); window.addEventListener(ANALYTICS_CONSENT_EVENT, viewStep);
+    return () => window.removeEventListener(ANALYTICS_CONSENT_EVENT, viewStep);
+  }, [step, draftReady, firstBudget]);
+
   const calculation = useMemo(() => {
-    const valid = estimateInputSchema.safeParse(input);
-    if (!valid.success) return { result: null, error: "Vérifiez les quantités, surfaces, dimensions et le code postal (5 chiffres)." };
-    try { return { result: estimateProject(valid.data, catalog), error: "" }; }
-    catch { return { result: null, error: "Un tarif manque pour cette configuration. Choisissez une autre variante ou contactez A2E pour un chiffrage adapté." }; }
+    const error = validateProjectFields(input);
+    if (error) return { result: null, error: error.message, type: error.type };
+    try { return { result: estimateProject(estimateInputSchema.parse(input), catalog), error: "", type: undefined }; }
+    catch { return { result: null, error: "Un tarif manque pour cette configuration. Choisissez une autre variante ou demandez une étude à A2E.", type: undefined }; }
   }, [input, catalog]);
   const result = calculation.result;
-  const activeTypes = input.projectTypes?.length ? input.projectTypes : [input.projectType];
-  const update = (partial: Partial<EstimateInput>) => { const session = getSessionId(); if (session && started.current !== session) { track("quote_started", "Premier choix simulateur"); started.current = session; } setInput((old) => ({ ...old, ...partial })); };
-  const toggleType = (type: ProjectType) => { const next = activeTypes.includes(type) ? activeTypes.filter((item) => item !== type) : [...activeTypes, type]; const projectTypes = next.length ? next : [type]; update({ projectType: projectTypes[0], projectTypes }); };
+  const activeTypes = selectedProjectTypes(input);
+  const activeDomain = activeTypes.includes(domain) ? domain : activeTypes[0];
+  const stepIndex = estimatorSteps.indexOf(step);
+
+  function recordStart() {
+    const session = getSessionId();
+    if (session && started.current !== session) { track("quote_started"); started.current = session; }
+  }
+  function update(partial: Partial<EstimateInput>) { recordStart(); setSubmitted(false); setDossier(null); setInput((old) => ({ ...old, ...partial })); }
+  function go(next: EstimatorStep) {
+    if (busy || firstBudget) return;
+    if (estimatorSteps.indexOf(next) >= 2 && !result) return;
+    recordStart(); setResetArmed(false); setStep(next);
+    setFurthest((old) => estimatorSteps.indexOf(next) > estimatorSteps.indexOf(old) ? next : old);
+    requestAnimationFrame(() => { heading.current?.focus({ preventScroll: true }); heading.current?.scrollIntoView({ behavior: "auto", block: "start" }); });
+  }
+  function chooseQuick(apply: boolean) {
+    if (apply && firstBudget) { setInput(firstBudget); setDomain(firstBudget.projectType); setStep("details"); setFurthest("details"); setDraftNote("Votre premier choix a été appliqué."); recordStart(); }
+    setFirstBudget(null); clearQuickSearch();
+  }
+  function reset() {
+    setInput(initialEstimate()); setStep("selection"); setFurthest("selection"); setDomain("windows"); setFirstBudget(null); setStatus(""); setSubmitted(false); setDossier(null); setContact({ name: "", phone: "", email: "", consent: false }); setResetArmed(false); started.current = undefined; setDraftNote("Un nouveau projet est prêt."); clearQuickSearch();
+  }
+  async function downloadPdf(saved: { id: string; reference: string }) {
+    setStatus("Votre dossier est enregistré. Téléchargement du pré-devis…");
+    const pdfResponse = await fetch("/api/estimate/pdf?estimateId=" + encodeURIComponent(saved.id));
+    if (!pdfResponse.ok) throw new Error("Dossier enregistré. Le PDF est temporairement indisponible ; réessayez son téléchargement ou contactez A2E avec la référence " + saved.reference);
+    const url = URL.createObjectURL(await pdfResponse.blob());
+    const anchor = document.createElement("a"); anchor.href = url; anchor.download = "pre-devis-" + saved.reference + ".pdf"; anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    track("pdf_downloaded"); setStatus("Votre PDF est prêt. L’équipe dispose de votre projet pour préparer la suite.");
+  }
+  async function retryPdf() {
+    if (!dossier || busy) return;
+    setBusy(true);
+    try { await downloadPdf(dossier); }
+    catch (error) { setStatus(error instanceof Error ? error.message : "Téléchargement interrompu. Votre dossier est conservé ; réessayez."); }
+    finally { setBusy(false); }
+  }
   async function submitLead(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); if (busy || pricingError || !result) return;
+    event.preventDefault();
+    if (busy || submitted || pricingError || !result) return;
     setBusy(true); setStatus("Préparation de votre dossier…");
     const data = new FormData(event.currentTarget);
+    const sessionId = getSessionId();
     try {
-      const response = await fetch("/api/leads", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: data.get("name"), phone: data.get("phone"), email: data.get("email"), consent: data.get("consent") === "on", input, result, sessionId: getSessionId() }) });
+      const response = await fetch("/api/leads", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: data.get("name"), phone: data.get("phone"), email: data.get("email"), consent: data.get("consent") === "on", input, result, sessionId, analyticsConsent: Boolean(sessionId) }) });
       const saved = await response.json();
       if (!response.ok || !saved.estimateId) throw new Error(saved.error ?? "Vérifiez vos coordonnées et votre configuration.");
-      setStatus("Votre dossier est enregistré. Téléchargement du pré-devis…");
-      const pdfResponse = await fetch("/api/estimate/pdf?estimateId=" + encodeURIComponent(saved.estimateId));
-      if (!pdfResponse.ok) { setStatus("Dossier enregistré. Le PDF est temporairement indisponible ; contactez A2E avec la référence " + saved.estimateNumber); return; }
-      const url = URL.createObjectURL(await pdfResponse.blob());
-      const anchor = document.createElement("a"); anchor.href = url; anchor.download = "pre-devis-" + saved.estimateNumber + ".pdf"; anchor.click();
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-      track("pdf_downloaded", saved.estimateNumber);
-      setStatus("Votre PDF est prêt. L’équipe dispose de votre projet pour préparer la suite.");
+      const created = { id: String(saved.estimateId), reference: String(saved.estimateNumber) };
+      setSubmitted(true); setDossier(created); await downloadPdf(created);
     } catch (error) { setStatus(error instanceof Error ? error.message : "Connexion interrompue. Vos choix sont conservés, réessayez."); }
     finally { setBusy(false); }
   }
-  return <div><div className="estimator-toolbar"><span>Vos choix sont conservés sur cet appareil.</span><button type="button" onClick={() => { if (window.confirm("Recommencer votre estimation ?")) { localStorage.removeItem("a2e-project-v2"); window.location.reload(); } }}>Recommencer</button></div><p className="mb-4 text-xs leading-5 text-ink/65">{pricingNotice}</p>{(pricingError || calculation.error) && <p role="alert" className="mb-4 border border-amber-300 bg-amber-50 p-4 text-sm">{pricingError || calculation.error}</p>}<div className="mb-5 sticky top-[5.3rem] z-30 rounded-card border border-champagne/45 bg-navy px-4 py-3 text-white shadow-[0_16px_40px_rgba(5,22,55,.18)] md:px-6"><div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-black uppercase tracking-[.16em] text-champagne">Estimation en direct</p><p className="text-sm text-white/75">Le montant évolue à chaque équipement ajouté. Un seul dossier peut regrouper plusieurs lots.</p></div><div className="flex items-baseline gap-2 whitespace-nowrap"><span className="text-xs font-bold text-white/65">{result ? result.low.toLocaleString("fr-FR") + " – " + result.high.toLocaleString("fr-FR") + " €" : "Configuration à compléter"}</span><strong className="text-2xl font-black text-white">{result ? result.mid.toLocaleString("fr-FR") + " €" : "—"}</strong></div></div></div><div className="grid gap-6 lg:grid-cols-[1.08fr_.92fr]"><div className="a2e-card p-5 md:p-7"><div className="mb-6"><p className="text-sm font-black uppercase tracking-[.16em] text-champagne">Calculette experte</p><h3 className="mt-2 text-2xl font-black text-navy">Composez votre projet poste par poste</h3><p className="mt-2 text-sm leading-6 text-ink/65">Cochez plusieurs lots, par exemple fenêtres + ITE + électricité. Le résultat et le futur PDF restent regroupés dans un seul dossier.</p></div><fieldset><legend className="mb-3 font-black text-navy">Lots à inclure</legend><div className="grid gap-3 sm:grid-cols-2">{projectLabels.map(([value, label, hint]) => { const selected = activeTypes.includes(value); return <button key={value} type="button" onClick={() => toggleType(value)} aria-pressed={selected} className={`min-h-20 rounded-card border p-4 text-left transition ${selected ? "border-champagne bg-pearl text-navy shadow-sm" : "border-ink/12 bg-white text-ink/70 hover:border-champagne"}`}><span className="block font-black">{label}</span><span className="mt-1 block text-xs leading-5 text-ink/55">{hint}</span></button>; })}</div></fieldset><div className="mt-6 grid gap-4 sm:grid-cols-2"><Field label="Ville"><input value={input.city ?? ""} onChange={(event) => update({ city: event.target.value })} className="input" /></Field><Field label="Code postal"><input value={input.postalCode ?? ""} onChange={(event) => update({ postalCode: event.target.value })} className="input" /></Field></div><div className="mt-6 grid gap-5">{activeTypes.map((type) => <DomainPanel key={type} type={type} catalog={catalog} input={{ ...input, surface: input.surfaces?.[type] ?? input.surface }} update={partial => update(partial.surface !== undefined ? { ...partial, surface: input.surface, surfaces: { ...input.surfaces, [type]: partial.surface } } : partial)} />)}</div><div className="mt-6 grid gap-4 sm:grid-cols-2"><Field label="Accès chantier"><select value={input.access} onChange={(event) => update({ access: event.target.value as EstimateInput["access"] })} className="input"><option value="simple">Accès simple</option><option value="medium">Accès moyen</option><option value="difficult">Accès difficile / manutention</option></select></Field><Field label="Délai souhaité"><select value={input.urgency} onChange={(event) => update({ urgency: event.target.value as EstimateInput["urgency"] })} className="input"><option value="info">Je me renseigne</option><option value="normal">Sous 3 mois</option><option value="fast">Rapide</option><option value="urgent">Urgent</option></select></Field></div></div>{result ? <ResultPanel result={result} submitLead={submitLead} status={status} busy={busy || Boolean(pricingError)} /> : <aside className="a2e-card p-6 self-start"><h3 className="text-xl font-semibold">Votre enveloppe apparaît ici.</h3><p className="mt-3 text-sm leading-6">{calculation.error}</p><Link href="/contact" className="button-text mt-4">Demander une étude personnalisée <ArrowRight size={16} /></Link></aside>}</div></div>;
+
+  return <div className={styles.flow}>
+    <div className={styles.draftBar}><span><ShieldCheck size={15} aria-hidden="true" />{draftNote}</span>{resetArmed ? <span><button type="button" onClick={reset}>Confirmer le nouveau projet</button><button type="button" onClick={() => setResetArmed(false)}>Annuler</button></span> : <button type="button" onClick={() => setResetArmed(true)} disabled={busy}>Recommencer</button>}</div>
+    {firstBudget && <section className={styles.restorePrompt} aria-label="Choisir le projet à reprendre"><div><p className={styles.eyebrow}>Un projet est déjà conservé</p><h2>Reprendre votre brouillon ?</h2><p>Votre premier choix « {titleFor(firstBudget.projectType)} » peut le remplacer. Votre brouillon actuel reste intact tant que vous ne l’appliquez pas.</p></div><div className={styles.promptActions}><button type="button" className={styles.primary} onClick={() => chooseQuick(true)}>Appliquer ce premier budget <ArrowRight size={17} /></button><button type="button" className={styles.secondary} onClick={() => chooseQuick(false)}>Garder mon brouillon</button></div></section>}
+    <nav className={styles.steps} aria-label="Étapes de votre estimation"><ol>{estimatorSteps.map((value, index) => <li key={value}><button type="button" aria-current={step === value ? "step" : undefined} disabled={busy || Boolean(firstBudget) || !canVisitStep(value, furthest, Boolean(result))} onClick={() => go(value)} className={step === value ? styles.currentStep : index < stepIndex ? styles.completeStep : ""}><span>{index < stepIndex ? <Check size={15} aria-hidden="true" /> : index + 1}</span><strong>{stepLabels[value]}</strong></button></li>)}</ol></nav>
+    <div className={styles.workspace}>
+      <section className={styles.stage} aria-labelledby="estimate-step-heading">
+        <fieldset className={styles.stageContent} disabled={Boolean(firstBudget) || busy}>
+        <header className={styles.stageHeading}><p className={styles.eyebrow}>Étape {stepIndex + 1} / 4</p><h2 id="estimate-step-heading" ref={heading} tabIndex={-1}>{stepTitles[step]}</h2><p>{stepHints[step]}</p></header>
+        {step === "selection" && <><fieldset className={styles.projectChoice}><legend className={styles.srOnly}>Travaux à inclure dans votre projet</legend>{projects.map(({ type, title, hint, icon: Icon }) => {
+          const selected = activeTypes.includes(type);
+          return <button key={type} type="button" aria-pressed={selected} className={`${styles.projectTile} ${selected ? styles.selectedTile : ""}`} onClick={() => { recordStart(); setSubmitted(false); setDossier(null); setInput(old => toggleProjectType(old, type)); }}><span className={styles.tileTop}><Icon size={24} strokeWidth={1.4} aria-hidden="true" /><span className={styles.tileCheck}>{selected && <Check size={13} />}</span></span><strong>{title}</strong><span>{hint}</span></button>;
+        })}</fieldset><p className={styles.selectionNote}>{activeTypes.length} métier{activeTypes.length > 1 ? "s" : ""} sélectionné{activeTypes.length > 1 ? "s" : ""} · Un seul dossier, même avec plusieurs travaux.</p></>}
+        {step === "details" && <>
+          <div className={styles.domainNav} role="group" aria-label="Choisir le métier à préciser">{activeTypes.map(type => <button key={type} type="button" aria-pressed={activeDomain === type} onClick={() => setDomain(type)} className={activeDomain === type ? styles.activeDomain : ""}>{titleFor(type)}</button>)}<button type="button" className={styles.addDomain} onClick={() => go("selection")}><Plus size={15} /> Ajouter des travaux</button></div>
+          <DomainFields key={activeDomain} type={activeDomain} catalog={catalog} input={{ ...input, surface: input.surfaces?.[activeDomain] ?? input.surface }} update={partial => { recordStart(); setSubmitted(false); setDossier(null); setInput(old => updateProjectDomain(old, activeDomain, partial)); }} />
+          {activeDomain !== "windows" && Boolean(input.customItems?.length) && <CustomOptions readOnlyCatalog options={catalog} selected={input.customItems ?? []} update={customItems => update({customItems})} />}
+          <details className={styles.options} open={Boolean(input.postalCode && !/^\d{5}$/.test(input.postalCode))}><summary>Lieu, accès et calendrier <span>{input.postalCode || input.city || "À préciser"}</span></summary><div className={styles.fieldGrid}><Field label="Ville"><input value={input.city ?? ""} maxLength={120} autoComplete="address-level2" onChange={event => update({ city: event.target.value })} /></Field><Field label="Code postal (facultatif)"><input value={input.postalCode ?? ""} maxLength={5} inputMode="numeric" autoComplete="postal-code" placeholder="Ex. 93200" onChange={event => update({ postalCode: event.target.value })} /></Field><Field label="Accès au chantier"><select value={input.access ?? "simple"} onChange={event => update({ access: event.target.value as EstimateInput["access"] })}><option value="simple">Simple</option><option value="medium">Moyen</option><option value="difficult">Difficile / manutention</option></select></Field><Field label="Délai souhaité"><select value={input.urgency} onChange={event => update({ urgency: event.target.value as EstimateInput["urgency"] })}><option value="info">Je me renseigne</option><option value="normal">Sous 3 mois</option><option value="fast">Rapide</option><option value="urgent">Urgent</option></select></Field></div><p className={styles.helper}>L’accès et le délai peuvent modifier les montants. Les hypothèses apparaissent dans le récapitulatif.</p></details>
+        </>}
+        {step === "budget" && result && <BudgetDetails result={result} edit={() => go("details")} />}
+        {step === "contact" && result && <>
+          <div className={styles.documentPreview}><FileText size={35} strokeWidth={1.3} aria-hidden="true" /><div><strong>Votre pré-devis A2E</strong><p>{activeTypes.map(titleFor).join(" · ")}<br />{result.lines.length} lignes · {money(result.mid)} au point central</p></div><button type="button" onClick={() => go("budget")}>Revoir le détail</button></div>
+          <form onSubmit={submitLead} className={styles.contactForm}>
+            <div className={styles.fieldGrid}><Field label="Nom et prénom"><input name="name" autoComplete="name" minLength={2} maxLength={100} required value={contact.name} onChange={event => setContact(old => ({ ...old, name: event.target.value }))} /></Field><Field label="Téléphone"><input name="phone" type="tel" autoComplete="tel" minLength={6} maxLength={30} required value={contact.phone} onChange={event => setContact(old => ({ ...old, phone: event.target.value }))} /></Field><Field label="Adresse email"><input name="email" type="email" autoComplete="email" maxLength={160} required value={contact.email} onChange={event => setContact(old => ({ ...old, email: event.target.value }))} /></Field></div>
+            <label className={styles.checkbox}><input name="consent" type="checkbox" required checked={contact.consent} onChange={event => setContact(old => ({ ...old, consent: event.target.checked }))} /><span>J’accepte d’être recontacté au sujet de ce projet. <Link href="/politique-confidentialite">Confidentialité</Link></span></label>
+            <button disabled={busy || submitted || Boolean(pricingError)} className={styles.primary}>{busy ? "Préparation en cours…" : submitted ? "Dossier enregistré" : "Obtenir mon dossier PDF"}{submitted ? <CheckCircle2 size={18} /> : <ArrowRight size={18} />}</button>
+            {dossier && <button type="button" className={styles.secondary} disabled={busy} onClick={retryPdf}>Télécharger à nouveau le PDF <FileText size={17} /></button>}
+            <p className={styles.helper}>Le devis définitif sera établi après métré et validation technique. Vos coordonnées servent à préparer la suite de ce projet.</p>
+            {status && <p role="status" aria-live="polite" className={`${styles.status} ${submitted ? styles.success : ""}`}>{status}</p>}
+          </form>
+        </>}
+        {calculation.error && <div role="alert" className={styles.error}><p>{calculation.error}</p>{calculation.type && <button type="button" onClick={() => { if (!activeTypes.includes(calculation.type!)) setInput(old => toggleProjectType(old, calculation.type!)); setDomain(calculation.type!); go("details"); }}>Vérifier {titleFor(calculation.type).toLowerCase()}</button>}<Link href="/contact">Demander une étude à A2E <ArrowRight size={15} /></Link></div>}
+        {pricingError && <p role="alert" className={styles.error}>{pricingError} Le dossier PDF pourra être demandé dès que le catalogue sera disponible.</p>}
+        <div className={styles.stageFooter}>{stepIndex > 0 ? <button type="button" className={styles.back} onClick={() => go(estimatorSteps[stepIndex - 1])} disabled={busy}><ArrowLeft size={17} /> Retour</button> : <span className={styles.helper}>Vous pourrez tout ajuster.</span>}{step !== "contact" && <button type="button" className={styles.primary} disabled={Boolean(firstBudget) || !draftReady || (step !== "selection" && !result)} onClick={() => go(estimatorSteps[stepIndex + 1])}>{step === "selection" ? "Préciser mon projet" : step === "details" ? "Voir mon budget" : "Recevoir mon PDF"}<ArrowRight size={18} /></button>}</div>
+        </fieldset>
+      </section>
+      <aside className={styles.summary} aria-label="Budget en direct"><div className={styles.summaryTop}><span className={styles.liveDot} /><p>Budget en direct</p></div><p className={styles.summaryAmount} aria-live="polite" aria-atomic="true">{result ? money(result.mid) : "À compléter"}</p><p className={styles.summaryRange}>{result ? money(result.low) + " à " + money(result.high) : "Vérifiez vos valeurs pour retrouver le budget."}</p><p className={styles.summaryCaption}>Point central indicatif</p><div className={styles.summaryLots}>{activeTypes.map(type => <span key={type}><Check size={14} />{titleFor(type)}</span>)}</div><p className={styles.summaryFine}>TVA à confirmer · aides non déduites.<br />Métré, supports et raccordements à valider.</p>{step === "details" && result && <button type="button" onClick={() => go("budget")}>Lire le détail <ArrowRight size={16} /></button>}<div className={styles.catalogNotice}>{pricingNotice}</div></aside>
+    </div>
+    <p className={styles.pricingFootnote}>{pricingNotice} TVA à confirmer, aides non déduites.</p>
+  </div>;
 }
 
-function DomainPanel({ type, input, update, catalog }: { catalog: PriceItem[]; type: ProjectType; input: EstimateInput; update: (partial: Partial<EstimateInput>) => void }) {
-  if (type === "windows") return <WindowPanel input={input} update={update} catalog={catalog} />;
-  if (type === "electricity") return <ItemPanel title="Équipements électriques" items={input.electricalItems ?? [newElectrical()]} add={newElectrical} update={(electricalItems) => update({ electricalItems })} options={[["socket", "Prises"], ["lighting", "Éclairages"], ["cooktop", "Plaque / four"], ["network", "Réseau"], ["ev", "Recharge véhicule"]]}><Field label="Surface logement (m²)"><input type="number" min="1" value={input.surface ?? 80} onChange={(event) => update({ surface: Number(event.target.value) })} className="input" /></Field><Field label="Périmètre"><select className="input" value={input.electricalScope ?? "full"} onChange={e => update({ electricalScope: e.target.value as EstimateInput["electricalScope"] })}><option value="full">Réfection complète hors tableau</option><option value="partial">Mise en sécurité partielle</option></select></Field><label className="my-4 flex items-center gap-3 text-sm"><input type="checkbox" checked={Boolean(input.includePanel)} onChange={e => update({ includePanel: e.target.checked })} /> Ajouter un tableau électrique</label></ItemPanel>;
-  if (type === "plumbing") return <ItemPanel title="Points d'eau" items={input.plumbingFixtures ?? [newFixture()]} add={newFixture} update={(plumbingFixtures) => update({ plumbingFixtures })} options={[["shower", "Douche"], ["bath", "Baignoire"], ["basin", "Lavabo / vasque"], ["wc", "WC"], ["sink", "Évier cuisine"], ["water_point", "Point eau simple"]]} />;
-  if (type === "global") return <EnergyPanel input={input} update={update} />;
-  return <div className="rounded-card border border-ink/10 bg-pearl p-4"><p className="mb-3 font-bold">{projectLabels.find(p => p[0] === type)?.[1]}</p><div className="grid gap-3 sm:grid-cols-2">{type === "hvac" && <Field label="Équipement"><select className="input" value={input.hvacType ?? "vmc_hygro"} onChange={e => update({ hvacType: e.target.value as EstimateInput["hvacType"] })}><option value="pac_air_water">PAC air/eau · circuit hydraulique</option><option value="pac_air_air">PAC air/air · unités intérieures</option><option value="pac_air_water_large">PAC air/eau · grande puissance</option><option value="vmc_simple">VMC simple flux</option><option value="vmc_hygro">VMC hygroréglable</option><option value="vmc_double">VMC double flux</option><option value="water_heater">Chauffe-eau thermodynamique</option></select></Field>}{type === "kitchen_bath" && <Field label="Pièce à rénover"><select className="input" value={input.roomType ?? "bathroom"} onChange={e => update({ roomType: e.target.value as EstimateInput["roomType"] })}><option value="bathroom">Salle de bain</option><option value="kitchen">Cuisine</option></select></Field>}<Field label={type === "insulation" ? "Surface ITE à traiter (m²)" : type === "roofing" ? "Surface toiture (m²)" : "Surface concernée (m²)"}><input type="number" min="1" value={input.surface ?? 80} onChange={(event) => update({ surface: Number(event.target.value) })} className="input" /></Field>{type === "insulation" && <><Field label="Finition"><select value={input.insulationFinish ?? "render"} onChange={(event) => update({ insulationFinish: event.target.value as EstimateInput["insulationFinish"] })} className="input"><option value="render">ITE sous enduit</option><option value="cladding">ITE bardage</option><option value="unknown">Isolation intérieure</option></select></Field><Field label="Isolant"><select className="input" value={input.insulationMaterial ?? "pse"} onChange={e => update({ insulationMaterial: e.target.value as EstimateInput["insulationMaterial"] })}><option value="pse">PSE blanc</option><option value="graphite">PSE graphité</option><option value="rockwool">Laine de roche</option><option value="wood">Fibre de bois</option></select></Field><label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={Boolean(input.includeScaffold)} onChange={e => update({ includeScaffold: e.target.checked })} /> Échafaudage supplémentaire hors prestation de base</label><Field label="Épaisseur isolant (mm)"><input type="number" min="80" value={input.insulationThickness ?? 120} onChange={(event) => update({ insulationThickness: Number(event.target.value) })} className="input" /></Field></>}</div></div>;
+function clearQuickSearch() {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("lot") && !url.searchParams.has("quantite")) return;
+  url.searchParams.delete("lot"); url.searchParams.delete("quantite");
+  window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
 }
 
-function WindowPanel({ input, update, catalog }: { catalog: PriceItem[]; input: EstimateInput; update: (partial: Partial<EstimateInput>) => void }) { const items = input.windowItems ?? [newWindow()]; const setItems = (next: WindowItem[]) => update({ windowItems: next }); const options = catalog.filter((item) => item.category === "windows" && !["window_pvc", "window_alu", "window_wood", "sliding_alu", "door_window_pvc", "door_window_alu", "bay_pvc", "entry_door_pvc", "entry_door_alu", "pose_renovation", "pose_total", "oscillo_battant", "shutter_motor", "oversize_joinery"].includes(item.key)); return <div className="rounded-card border border-ink/10 bg-pearl p-4"><div className="mb-3 flex items-start justify-between gap-3"><div><p className="font-black text-navy">Ouvrants et options</p><p className="text-xs leading-5 text-ink/60">Chaque ligne accepte sa propre dimension, ouverture, matériau et pose.</p></div><button type="button" onClick={() => setItems([...items, newWindow()])} className="inline-flex min-h-11 items-center gap-2 rounded-card border border-navy/15 px-3 text-sm font-black text-navy"><Plus size={16} /> Ajouter</button></div><div className="grid gap-3">{items.map((item, index) => <div key={index} className="rounded-card border border-ink/10 bg-white p-3"><div className="mb-3 flex items-center justify-between"><p className="font-black text-navy">Ouvrant {index + 1}</p><div className="flex gap-2"><button type="button" aria-label={"Dupliquer l’ouvrant " + (index + 1)} onClick={() => setItems([...items.slice(0, index + 1), { ...item }, ...items.slice(index + 1)])} className="min-h-11 min-w-11 grid place-items-center"><Copy size={16} /></button>{items.length > 1 && <button type="button" onClick={() => setItems(items.filter((_, current) => current !== index))} className="min-h-11 min-w-11 grid place-items-center text-ink/60" aria-label={"Supprimer l’ouvrant " + (index + 1)}><Trash2 size={16} /></button>}</div></div><div className="grid gap-3 sm:grid-cols-2"><Field label="Type"><select value={item.kind} onChange={(event) => setItems(items.map((old, current) => current === index ? changeWindowKind(old, event.target.value as WindowItem["kind"]) : old))} className="input"><option value="window">Fenêtre</option><option value="door_window">Porte-fenêtre</option><option value="bay">Baie vitrée</option><option value="entry_door">Porte d'entrée 5 points</option></select></Field><Field label="Matériau"><select value={item.material} onChange={(event) => setItems(items.map((old, current) => current === index ? { ...old, material: event.target.value as WindowItem["material"] } : old))} className="input">{windowMaterialsForKind(item.kind).map((material) => <option key={material} value={material}>{material === "wood" ? "Bois" : material === "alu" ? "Aluminium" : "PVC"}</option>)}</select></Field><Field label="Quantité"><input type="number" min="1" value={item.quantity} onChange={(event) => setItems(items.map((old, current) => current === index ? { ...old, quantity: Number(event.target.value) } : old))} className="input" /></Field><Field label="Largeur (cm)"><input type="number" min="30" value={item.width} onChange={(event) => setItems(items.map((old, current) => current === index ? { ...old, width: Number(event.target.value) } : old))} className="input" /></Field><Field label="Hauteur (cm)"><input type="number" min="30" value={item.height} onChange={(event) => setItems(items.map((old, current) => current === index ? { ...old, height: Number(event.target.value) } : old))} className="input" /></Field><Field label="Ouverture"><select value={item.opening} onChange={(event) => setItems(items.map((old, current) => current === index ? { ...old, opening: event.target.value as WindowItem["opening"] } : old))} className="input"><option value="french">À la française</option><option value="oscillo">Oscillo-battante</option><option value="fixed">Fixe</option><option value="sliding">Coulissante</option></select></Field><Field label="Pose"><select value={item.installPack} onChange={(event) => setItems(items.map((old, current) => current === index ? { ...old, installPack: event.target.value as WindowItem["installPack"] } : old))} className="input"><option value="renovation">Pose rénovation</option><option value="total">Dépose totale + reprises</option></select></Field><label className="flex min-h-12 items-center gap-3 rounded-card border border-ink/12 px-4 text-sm font-bold"><input type="checkbox" checked={item.shutter} onChange={(event) => setItems(items.map((old, current) => current === index ? { ...old, shutter: event.target.checked } : old))} /> Volet roulant motorisé</label></div></div>)}</div><CustomOptions options={options} selected={input.customItems ?? []} update={(customItems) => update({ customItems })} /></div>; }
-
-function CustomOptions({ options, selected, update }: { options: PriceItem[]; selected: Array<{ key: string; quantity: number }>; update: (items: Array<{ key: string; quantity: number }>) => void }) { return <div className="mt-4 border-t border-ink/10 pt-4"><div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div><p className="font-black text-navy">Options complémentaires</p><p className="text-xs text-ink/60">Ajoutez une ligne du catalogue, comme rideaux, vitrage ou accessoire.</p></div><select aria-label="Ajouter une option complémentaire" value="" onChange={(event) => { if (!event.target.value) return; update([...selected, { key: event.target.value, quantity: 1 }]); }} className="input max-w-xs"><option value="">Ajouter un item...</option>{options.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></div><div className="mt-3 grid gap-2">{selected.map((item, index) => <div key={`${item.key}-${index}`} className="grid grid-cols-[minmax(0,1fr)_5rem_auto] items-center gap-2 rounded-card border border-ink/10 bg-white px-3 py-2 text-sm"><span className="font-bold text-navy">{options.find((option) => option.key === item.key)?.label ?? item.key}</span><input aria-label="Quantité option" type="number" min="1" value={item.quantity} onChange={(event) => update(selected.map((old, current) => current === index ? { ...old, quantity: Number(event.target.value) } : old))} className="input" /><button type="button" onClick={() => update(selected.filter((_, current) => current !== index))} aria-label="Supprimer cette option" className="min-h-11 min-w-11 grid place-items-center text-ink/60"><Trash2 size={15} /></button></div>)}</div></div>; }
-
-function ItemPanel<T extends ElectricalItem | PlumbingFixture>({ title, items, add, update, options, children }: { title: string; items: T[]; add: () => T; update: (items: T[]) => void; options: Array<[string, string]>; children?: ReactNode }) { return <div className="rounded-card border border-ink/10 bg-pearl p-4">{children}<div className="mb-3 flex items-center justify-between gap-3"><p className="font-black text-navy">{title}</p><button type="button" onClick={() => update([...items, add()])} className="inline-flex min-h-11 items-center gap-2 rounded-card border border-navy/15 px-3 text-sm font-black text-navy"><Plus size={16} /> Ajouter</button></div><div className="grid gap-2">{items.map((item, index) => <div key={index} className="grid grid-cols-[minmax(0,1fr)_5rem_auto] items-end gap-2 rounded-card border border-ink/10 bg-white p-3"><Field label="Équipement"><select value={item.kind} onChange={(event) => update(items.map((old, current) => current === index ? { ...old, kind: event.target.value } as T : old))} className="input">{options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field><Field label="Quantité"><input type="number" min="1" value={item.quantity} onChange={(event) => update(items.map((old, current) => current === index ? { ...old, quantity: Number(event.target.value) } as T : old))} className="input" /></Field>{items.length > 1 && <button type="button" onClick={() => update(items.filter((_, current) => current !== index))} aria-label="Supprimer cet équipement" className="min-h-11 min-w-11 grid place-items-center text-ink/60"><Trash2 size={16} /></button>}</div>)}</div></div>; }
-
-function EnergyPanel({ input, update }: { input: EstimateInput; update: (partial: Partial<EstimateInput>) => void }) { const energy = input.energy ?? {}; const setEnergy = (partial: Partial<EnergyInput>) => update({ energy: { ...energy, ...partial } }); return <div className="rounded-card border border-ink/10 bg-pearl p-4"><p className="font-black text-navy">Périmètre et pré-étude énergie</p><Field label="Niveau des travaux"><select className="input mt-3" value={input.globalLevel ?? "medium"} onChange={e => update({ globalLevel: e.target.value as EstimateInput["globalLevel"] })}><option value="light">Rénovation légère</option><option value="medium">Rénovation intermédiaire</option><option value="full">Rénovation complète</option></select></Field><p className="mt-3 text-xs leading-5 text-ink/65">Seul, ce lot estime une rénovation au m². Avec des lots détaillés, seuls ces lots et leur coordination sont chiffrés ; les autres travaux restent à définir.</p><div className="mt-3 grid gap-3 sm:grid-cols-2"><Field label="Surface logement (m²)"><input type="number" min="1" value={input.surface ?? 80} onChange={(event) => update({ surface: Number(event.target.value) })} className="input" /></Field><Field label="Facture annuelle énergie (€)"><input type="number" min="0" value={energy.annualEnergyCost ?? ""} onChange={(event) => setEnergy({ annualEnergyCost: Number(event.target.value) })} className="input" /></Field><Field label="Consommation annuelle (kWh)"><input type="number" min="0" value={energy.annualConsumption ?? ""} onChange={(event) => setEnergy({ annualConsumption: Number(event.target.value) })} className="input" /></Field><Field label="Énergie principale"><select value={energy.energyType ?? "electricity"} onChange={(event) => setEnergy({ energyType: event.target.value as EnergyInput["energyType"] })} className="input"><option value="electricity">Électricité</option><option value="gas">Gaz</option><option value="fuel">Fioul</option><option value="other">Autre</option></select></Field><Field label="DPE actuel"><select value={energy.currentDpe ?? "unknown"} onChange={(event) => setEnergy({ currentDpe: event.target.value as EnergyInput["currentDpe"] })} className="input"><option value="unknown">Je ne sais pas</option><option value="A_B">A / B</option><option value="C_D">C / D</option><option value="E">E</option><option value="F_G">F / G</option></select></Field><Field label="Isolation actuelle"><select value={energy.insulation ?? "unknown"} onChange={(event) => setEnergy({ insulation: event.target.value as EnergyInput["insulation"] })} className="input"><option value="unknown">Je ne sais pas</option><option value="good">Bonne</option><option value="partial">Partielle</option><option value="none">Absente</option></select></Field><Field label="Foyer"><select value={energy.household ?? 2} onChange={(event) => setEnergy({ household: Number(event.target.value) })} className="input"><option value="1">1 personne</option><option value="2">2 personnes</option><option value="3">3 personnes</option><option value="4">4 personnes ou plus</option></select></Field></div></div>; }
-
-function ResultPanel({ result, submitLead, status, busy }: { result: ReturnType<typeof estimateProject>; submitLead: (event: FormEvent<HTMLFormElement>) => void; status: string; busy: boolean }) {
- return <form onSubmit={submitLead} className="a2e-card p-5 md:p-7 self-start"><div className="flex items-start gap-3"><FileText className="mt-1 shrink-0 text-champagne" size={26} /><div><p className="eyebrow mb-2">Votre projet, en clair</p><h3 className="text-2xl font-semibold text-navy">Une première enveloppe.</h3></div></div>
- <div className="mt-5 grid grid-cols-1 gap-3 text-center sm:grid-cols-3"><Price label="Fourchette basse" value={result.low} /><Price label="Point central" value={result.mid} featured /><Price label="Fourchette haute" value={result.high} /></div>
- <p className="mt-3 text-xs leading-5 text-ink/65">Montants indicatifs · TVA à confirmer · aides non déduites. Le devis définitif suit le métré et la visite technique.</p>
- <details className="mt-5 border-y border-ink/10 py-4" open><summary className="cursor-pointer font-semibold text-navy">Le détail de vos travaux</summary><div className="mt-3 space-y-3">{result.lines.map((line, index) => <div key={index} className="border-b border-ink/10 pb-3 text-sm"><div className="flex justify-between gap-3"><strong className="font-semibold">{line.label}</strong><span className="whitespace-nowrap">{line.mid.toLocaleString("fr-FR")} €</span></div><p className="mt-1 text-xs text-ink/65">{line.quantity} {line.unit} · {line.low.toLocaleString("fr-FR")} à {line.high.toLocaleString("fr-FR")} €</p><p className="mt-1 text-xs leading-5 text-ink/60">{line.description}</p></div>)}</div></details>
- <Link href="/aides" className="button-text mt-4">Explorer les possibilités d’aide <ArrowRight size={16} /></Link><details className="mt-4 text-sm"><summary className="cursor-pointer font-semibold">Hypothèses de calcul</summary><ul className="mt-3 space-y-2">{result.assumptions.map(a => <li key={a}>{a}</li>)}</ul></details><p className="mt-4 text-sm text-ink/65">Durée indicative : {result.duration}</p>{result.roi && <p className="mt-4 rounded-card bg-pearl p-4 text-sm">Scénario énergie théorique : {result.roi.annualSavings.toLocaleString("fr-FR")} € / an sur la base de votre facture. À vérifier par un audit.</p>}
- <div className="mt-6 border-t border-ink/10 pt-6"><h4 className="text-xl font-semibold">Votre idée mérite une suite.</h4><p className="mt-2 text-sm leading-6 text-ink/65">Recevez votre dossier PDF et demandez un échange pour affiner le projet avec notre équipe.</p><div className="mt-4 grid gap-3"><Field label="Nom et prénom"><input name="name" autoComplete="name" minLength={2} maxLength={100} required className="input" /></Field><Field label="Téléphone"><input name="phone" type="tel" autoComplete="tel" minLength={6} maxLength={30} required className="input" /></Field><Field label="Adresse email"><input name="email" type="email" autoComplete="email" maxLength={160} required className="input" /></Field><label className="flex items-start gap-3 text-sm leading-6 text-ink/65"><input name="consent" type="checkbox" required className="mt-1.5 h-4 w-4 shrink-0" /> <span>J’accepte d’être recontacté au sujet de ce projet. <a href="/politique-confidentialite" className="underline">Confidentialité</a></span></label><button disabled={busy} className="button-primary w-full">{busy ? "Envoi indisponible ou en cours" : "Obtenir mon dossier PDF"} <ArrowRight size={18} /></button><p role="status" aria-live="polite" className="min-h-6 text-sm leading-6 text-ink/75">{status}</p></div></div></form>;
+function BudgetDetails({ result, edit }: { result: EstimateResult; edit: () => void }) {
+  return <div className={styles.budgetDetails}>
+    <div className={styles.ranges}>{(["low", "mid", "high"] as const).map((scenario, index) => <div key={scenario} className={scenario === "mid" ? styles.centralRange : ""}><span>{["Fourchette basse", "Point central", "Fourchette haute"][index]}</span><strong>{money(result[scenario])}</strong></div>)}</div>
+    <p className={styles.helper}>Une enveloppe indicative pour le périmètre saisi. Les variantes et les contraintes restent à confirmer avec A2E.</p>
+    <div className={styles.lineHeading}><h3>Travaux retenus <span>{result.lines.length} lignes</span></h3><button type="button" onClick={edit}>Modifier <Wrench size={15} /></button></div>
+    <ol className={styles.budgetLines}>{result.lines.map((line, index) => <li key={index}><div className={styles.lineTitle}><h4>{line.label}</h4><strong>{money(line.mid)}</strong></div><p>{line.quantity.toLocaleString("fr-FR")} {displayUnit(line.unit, line.quantity)} · {money(line.low)} à {money(line.high)}</p><details><summary>Prestation et hypothèses</summary><p>{line.description}</p>{line.reference && <p>Gamme indicative : {line.reference}</p>}</details></li>)}</ol>
+    <details className={styles.options}><summary>Hypothèses et étapes du chantier</summary><ul className={styles.assumptions}>{result.assumptions.map(value => <li key={value}>{value}</li>)}</ul><p className={styles.helper}>Durée indicative : {result.duration}</p><ol className={styles.roadmap}>{result.roadmap.map(value => <li key={value}>{value}</li>)}</ol></details>
+    {result.roi && <p className={styles.energyNote}>Scénario énergie théorique : <strong>{money(result.roi.annualSavings)} / an</strong> sur la base de votre facture. À vérifier par un audit.</p>}
+    <Link href="/aides" className={styles.inlineLink}>Explorer les possibilités d’aide <ArrowRight size={16} /></Link>
+  </div>;
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="grid min-w-0 flex-1 gap-2 text-sm font-bold text-ink/82">{label}{children}</label>; }
-function Price({ label, value, featured = false }: { label: string; value: number; featured?: boolean }) { return <div className={`rounded-card p-3 text-white ${featured ? "bg-champagne text-navy" : "bg-navy"}`}><p className={`text-xs font-bold ${featured ? "text-navy/65" : "text-white/64"}`}>{label}</p><p className="text-lg font-black">{value.toLocaleString("fr-FR")} €</p></div>; }
+function displayUnit(unit: string, quantity: number) { return unit === "m2" ? "m²" : unit === "unit" ? quantity > 1 ? "unités" : "unité" : unit === "point" ? quantity > 1 ? "points" : "point" : unit === "forfait" ? quantity > 1 ? "forfaits" : "forfait" : unit; }

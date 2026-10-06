@@ -52,15 +52,15 @@ export const services = [
     title: "Électricité",
     icon: PlugZap,
     excerpt: "Réfection complète, mise en sécurité, tableau électrique, prises, éclairages et adaptations techniques.",
-    bullets: ["Prix au m²", "Tableau électrique", "Points supplémentaires"],
-    packs: ["Diagnostic réseau", "Distribution", "Tableau", "Essais et repérage"]
+    bullets: ["Prises et éclairages", "Circuits dédiés", "Tableau composé"],
+    packs: ["Équipements à la carte", "Packs avec quantités", "Tableau séparé", "Essais et repérage"]
   },
   {
     slug: "plomberie",
     title: "Plomberie",
     icon: Droplets,
     excerpt: "Arrivées d'eau, évacuations, raccordements, cuisine, salle d'eau et attentes techniques.",
-    bullets: ["Points d'eau", "Distribution", "Raccordement chauffe-eau"],
+    bullets: ["Sanitaires à la carte", "Fourniture et pose", "Pack avec quantités"],
     packs: ["Repérage existant", "Alimentations", "Évacuations", "Mise en eau"]
   },
   {

@@ -9,5 +9,6 @@ export const contactSchema = z.object({
   message: z.string().trim().min(10).max(12000),
   consent: z.literal(true),
   sessionId: z.string().max(80).optional(),
+  analyticsConsent: z.boolean().optional(),
   website: z.string().max(0).optional()
 }).strict();

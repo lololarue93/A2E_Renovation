@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { priceItems, pricingCoefficients } from "../src/lib/pricing/price-data";
+import { priceItems, pricingCoefficients, detailedPriceKeys } from "../src/lib/pricing/price-data";
 import { siteSettings } from "../src/lib/site-data";
 
 const prisma = new PrismaClient();
@@ -18,7 +18,11 @@ async function bootstrap() {
   if (!administrator) {
     await prisma.user.create({ data: { email, passwordHash: await bcrypt.hash(password, 12), role: "admin" } });
   }
+  const pendingDetailedKeys = new Set(detailedPriceKeys);
   for (const item of priceItems) {
+    // New demonstration rates need an explicit reviewed admin import.
+    // Neither activate them nor overwrite a company's existing catalogue.
+    if (pendingDetailedKeys.has(item.key)) continue;
     await prisma.priceItem.upsert({ where: { key: item.key }, update: {}, create: item });
   }
   await prisma.pricingSettings.upsert({
@@ -28,6 +32,7 @@ async function bootstrap() {
     where: { key: "company" }, update: {}, create: { key: "company", value: siteSettings }
   });
   console.info("Production initialization complete; existing prices, settings and users preserved.");
+  console.info("Detailed item rates require a reviewed admin import before the new calculator is opened.");
 }
 
 bootstrap()

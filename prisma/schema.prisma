@@ -32,16 +32,37 @@ model Lead {
   phone         String
   email         String
   city          String?
+  company       String?
   sourceLead    String     @default("website")
   typeProjet    String
   budget        Int?
   status        LeadStatus @default(nouveau)
   maturityScore Int?
   consent       Boolean    @default(false)
+  nextAction    String?
+  nextActionAt  DateTime?
+  crmVersion    Int        @default(0)
+  activities    LeadActivity[]
   project       Project?
   estimates     Estimate[]
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
+
+  @@index([status, nextActionAt])
+  @@index([sourceLead])
+}
+
+model LeadActivity {
+  id         String   @id @default(cuid())
+  leadId     String
+  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  kind       String
+  note       String
+  occurredAt DateTime
+  actor      String?
+  createdAt  DateTime @default(now())
+
+  @@index([leadId, occurredAt])
 }
 
 model Project {

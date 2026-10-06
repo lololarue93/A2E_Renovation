@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { ArrowUpRight, CheckCircle2 } from "lucide-react";
 import { getSessionId } from "@/components/analytics/AnalyticsTracker";
+import { hasAnalyticsConsent } from "@/lib/analytics-consent";
 
 export function ContactForm() {
   const [sending, setSending] = useState(false);
@@ -13,7 +14,7 @@ export function ContactForm() {
     event.preventDefault(); const form = event.currentTarget; const data = new FormData(form);
     setSending(true); setError("");
     try {
-      const response = await fetch("/api/contact", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: data.get("name"), email: data.get("email"), phone: data.get("phone"), city: data.get("city"), type: data.get("type"), message: data.get("message"), consent: data.get("consent") === "on", website: data.get("website"), sessionId: getSessionId() }) });
+      const response = await fetch("/api/contact", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: data.get("name"), email: data.get("email"), phone: data.get("phone"), city: data.get("city"), type: data.get("type"), message: data.get("message"), consent: data.get("consent") === "on", website: data.get("website"), sessionId: getSessionId(), analyticsConsent: hasAnalyticsConsent() }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "L'envoi n'a pas pu etre confirme.");
       setReference(result.leadId); form.reset();

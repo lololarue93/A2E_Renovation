@@ -11,8 +11,13 @@ export type WindowItem = {
   shutter: boolean;
 };
 
-export type ElectricalItem = { kind: "socket" | "lighting" | "cooktop" | "ev" | "network"; quantity: number };
-export type PlumbingFixture = { kind: "shower" | "bath" | "basin" | "wc" | "sink" | "water_point"; quantity: number };
+export type ElectricalItem = { kind: "socket" | "socket_replace" | "lighting" | "luminaire" | "cooktop" | "ev" | "network"; quantity: number };
+export type PlumbingFixture = { kind: "shower" | "bath" | "basin" | "wc" | "sink" | "water_point" | "removal"; quantity: number };
+export const electricalPacks: Record<"room" | "apartment", { label: string; items: ElectricalItem[] }> = {
+  room: { label: "Pack pièce : 4 prises, 1 point lumineux, 1 circuit dédié", items: [{ kind: "socket", quantity: 4 }, { kind: "lighting", quantity: 1 }, { kind: "cooktop", quantity: 1 }] },
+  apartment: { label: "Pack logement : 12 prises, 5 points lumineux, 3 circuits dédiés", items: [{ kind: "socket", quantity: 12 }, { kind: "lighting", quantity: 5 }, { kind: "cooktop", quantity: 3 }] }
+};
+export const bathroomPackFixtures: PlumbingFixture[] = [{ kind: "shower", quantity: 1 }, { kind: "basin", quantity: 1 }, { kind: "wc", quantity: 1 }];
 export type EnergyInput = {
   annualConsumption?: number;
   annualEnergyCost?: number;
@@ -47,10 +52,18 @@ export type EstimateInput = {
   insulationThickness?: number;
   globalLevel?: "light" | "medium" | "full";
   electricalScope?: "partial" | "full";
+  electricalMode?: "items" | "pack" | "legacy";
+  electricalPack?: "room" | "apartment";
+  electricalPanel?: "none" | "1r4c" | "2r8c" | "3r12c";
   electricalPoints?: number;
   electricalItems?: ElectricalItem[];
   plumbingPoints?: number;
   plumbingFixtures?: PlumbingFixture[];
+  plumbingMode?: "items" | "bathroom_pack" | "legacy";
+  includePlumbingDistribution?: boolean;
+  bathroomMode?: "finishes" | "standard_pack" | "legacy";
+  bathroomFloorArea?: number;
+  bathroomWallArea?: number;
   includePanel?: boolean;
   includeWaterHeaterConnection?: boolean;
   hvacType?: "pac" | "pac_air_water" | "pac_air_air" | "pac_air_water_large" | "vmc_simple" | "vmc_hygro" | "vmc_double" | "water_heater";
@@ -117,6 +130,39 @@ function windowLines(input: EstimateInput, catalog: PriceItem[]) {
   return lines;
 }
 
+const electricalKeys: Record<ElectricalItem["kind"], string> = { socket: "electric_socket_new", socket_replace: "electric_socket_replace", lighting: "electric_light_point", luminaire: "electric_luminaire_install", cooktop: "electric_dedicated_circuit", ev: "electric_ev", network: "electric_network_point" };
+function detailedElectricalLines(input: EstimateInput, catalog: PriceItem[]) {
+  const items = input.electricalMode === "pack" ? electricalPacks[input.electricalPack ?? "room"].items : input.electricalItems ?? [];
+  const lines = items.map(item => makeLine(catalog, electricalKeys[item.kind], item.quantity));
+  if (input.electricalPanel && input.electricalPanel !== "none") lines.push(makeLine(catalog, `electric_panel_${input.electricalPanel}_supply`), makeLine(catalog, "electric_panel_install"));
+  if (!lines.length) throw new Error("Choisissez au moins un point electrique ou un tableau.");
+  return lines;
+}
+function detailedPlumbingLines(fixtures: PlumbingFixture[], catalog: PriceItem[]) {
+  return fixtures.flatMap(fixture => fixture.kind === "water_point" ? [makeLine(catalog, "plumbing_water_point_v2", fixture.quantity)] : fixture.kind === "removal" ? [makeLine(catalog, "plumbing_removal_only", fixture.quantity)] : [makeLine(catalog, `plumbing_${fixture.kind}_supply`, fixture.quantity), makeLine(catalog, `plumbing_${fixture.kind}_install`, fixture.quantity)]);
+}
+export function validateDetailedScope(input: EstimateInput): { field: keyof EstimateInput; message: string } | undefined {
+  const types = new Set(input.projectTypes?.length ? input.projectTypes : [input.projectType]);
+  const issue = (field: keyof EstimateInput, message: string) => ({field,message});
+  if(types.has("kitchen_bath") && input.roomType==="kitchen" && input.bathroomMode!==undefined && input.bathroomMode!=="legacy" && input.surfaces?.kitchen_bath===undefined) return issue("bathroomMode","Précisez la surface réelle de la cuisine. La surface du logement n’est pas utilisée pour cette pièce.");
+  if(types.has("electricity") && input.electricalMode === "items" && !input.electricalItems?.length && (!input.electricalPanel || input.electricalPanel === "none")) return issue("electricalItems","Choisissez un équipement électrique ou un tableau.");
+  if(types.has("plumbing") && input.plumbingMode === "items" && !input.plumbingFixtures?.length && !input.includePlumbingDistribution && !input.includeWaterHeaterConnection) return issue("plumbingFixtures","Choisissez un sanitaire, un point d’eau ou une prestation réseau.");
+  if (types.has("kitchen_bath") && input.roomType !== "kitchen" && input.bathroomMode === "standard_pack" && types.has("plumbing")) return issue("bathroomMode","Le pack salle de bain inclut les sanitaires. Retirez le lot plomberie ou choisissez les finitions seules.");
+  if (types.has("plumbing") && input.plumbingMode === "items" && input.includePlumbingDistribution && input.plumbingFixtures?.some(item => item.kind === "water_point")) return issue("plumbingFixtures","Choisissez les points d’eau courts ou le forfait distribution, sans cumul.");
+  if(types.has("kitchen_bath") && input.roomType!=="kitchen" && input.bathroomMode==="finishes" && input.bathroomFloorArea===undefined && input.bathroomWallArea===undefined) return issue("bathroomFloorArea","Précisez une surface de sol ou de murs à rénover.");
+  const reserved = new Set<string>();
+  if(types.has("electricity") && (input.electricalMode === "items" || input.electricalMode === "pack")) for(const key of ["electric_full","electric_partial","electric_panel","electric_point","electric_cooktop","electric_network"]) reserved.add(key);
+  if(types.has("plumbing") && (input.plumbingMode === "items" || input.plumbingMode === "bathroom_pack")) for(const key of ["plumbing_point","plumbing_distribution","plumbing_shower","plumbing_bath","plumbing_basin","plumbing_wc","plumbing_sink"]) reserved.add(key);
+  if (types.has("electricity") && input.electricalMode === "pack") for (const item of electricalPacks[input.electricalPack ?? "room"].items) reserved.add(electricalKeys[item.kind]);
+  if(types.has("electricity") && input.electricalPanel && input.electricalPanel!=="none") for(const key of ["electric_panel_install",`electric_panel_${input.electricalPanel}_supply`]) reserved.add(key);
+  if ((types.has("plumbing") && input.plumbingMode === "bathroom_pack") || (types.has("kitchen_bath") && input.bathroomMode === "standard_pack" && input.roomType !== "kitchen")) for (const fixture of bathroomPackFixtures) { reserved.add(`plumbing_${fixture.kind}_supply`); reserved.add(`plumbing_${fixture.kind}_install`); }
+  if(types.has("kitchen_bath") && input.bathroomMode === "standard_pack" && input.roomType !== "kitchen") for(const key of ["bathroom","italian_shower","plumbing_point","plumbing_distribution","plumbing_shower","plumbing_basin","plumbing_wc"]) reserved.add(key);
+  if(types.has("plumbing") && input.includePlumbingDistribution && (input.plumbingMode === "items" || input.plumbingMode === "bathroom_pack")) {reserved.add("plumbing_distribution_v2");reserved.add("plumbing_water_point_v2");}
+  if(types.has("kitchen_bath") && input.roomType!=="kitchen" && input.bathroomFloorArea!==undefined && (input.bathroomMode === "standard_pack" || input.bathroomMode === "finishes")) reserved.add("bathroom_floor_finish");
+  if(types.has("kitchen_bath") && input.roomType!=="kitchen" && input.bathroomWallArea!==undefined && (input.bathroomMode === "standard_pack" || input.bathroomMode === "finishes")) reserved.add("bathroom_wall_finish");
+  if (input.customItems?.some(item => reserved.has(item.key))) return issue("customItems","Une option recouvre le pack ou une prestation déjà retenue. Retirez cette option ; utilisez les quantités du mode à la carte pour adapter le contenu.");
+}
+
 function buildLinesForType(input: EstimateInput, projectType: ProjectType, catalog: PriceItem[]): EstimateLine[] {
   input = { ...input, surface: input.surfaces?.[projectType] ?? input.surface };
   const lineFromItem = (...args: [string, number?, string?, number?]) => makeLine(catalog, ...args);
@@ -130,6 +176,7 @@ function buildLinesForType(input: EstimateInput, projectType: ProjectType, catal
     return lines;
   }
   if (projectType === "electricity") {
+    if (input.electricalMode === "items" || input.electricalMode === "pack") return detailedElectricalLines(input, catalog);
     const surface = input.surface ?? 80;
     const lines = [lineFromItem(input.electricalScope === "partial" ? "electric_partial" : "electric_full", surface)];
     if (input.includePanel) lines.push(lineFromItem("electric_panel"));
@@ -141,6 +188,14 @@ function buildLinesForType(input: EstimateInput, projectType: ProjectType, catal
     return lines;
   }
   if (projectType === "plumbing") {
+    if (input.plumbingMode === "items" || input.plumbingMode === "bathroom_pack") {
+      const fixtures = input.plumbingMode === "bathroom_pack" ? bathroomPackFixtures : input.plumbingFixtures ?? [];
+      const lines = detailedPlumbingLines(fixtures, catalog);
+      if (input.includePlumbingDistribution) lines.push(lineFromItem("plumbing_distribution_v2"));
+      if (input.includeWaterHeaterConnection) lines.push(lineFromItem("water_heater_connection"));
+      if (!lines.length) throw new Error("Choisissez au moins un sanitaire ou un point d'eau.");
+      return lines;
+    }
     const fixtures = input.plumbingFixtures ?? [{ kind: "water_point", quantity: input.plumbingPoints ?? 1 }];
     const lines = fixtures.map((fixture) => fixture.kind === "water_point" ? lineFromItem("plumbing_point", fixture.quantity) : lineFromItem(`plumbing_${fixture.kind}`, fixture.quantity));
     lines.push(lineFromItem("plumbing_distribution"));
@@ -159,6 +214,13 @@ function buildLinesForType(input: EstimateInput, projectType: ProjectType, catal
     return [lineFromItem(input.hvacType ?? "vmc_hygro")];
   }
   if (projectType === "roofing") return [lineFromItem(input.globalLevel === "full" ? "roof_renovation" : "roof_repair", input.surface ?? 60), ...(input.access === "difficult" ? [lineFromItem("framework_repair")] : [])];
+  if (projectType === "kitchen_bath" && input.roomType !== "kitchen" && (input.bathroomMode === "standard_pack" || input.bathroomMode === "finishes")) {
+    const lines = input.bathroomMode === "standard_pack" ? detailedPlumbingLines(bathroomPackFixtures, catalog) : [];
+    if (input.bathroomFloorArea !== undefined) lines.push(lineFromItem("bathroom_floor_finish", input.bathroomFloorArea));
+    if (input.bathroomWallArea !== undefined) lines.push(lineFromItem("bathroom_wall_finish", input.bathroomWallArea));
+    if (!lines.length) throw new Error("Precisez une surface de sol ou de murs a renover.");
+    return lines;
+  }
   return [lineFromItem(projectType === "kitchen_bath" ? (input.roomType ?? "bathroom") : "global_light", input.surface ?? (projectType === "kitchen_bath" ? 7 : 20))];
 }
 
@@ -184,6 +246,8 @@ function energyStudy(input: EstimateInput, mid: number) {
 }
 
 export function estimateProject(input: EstimateInput, catalog: PriceItem[] = priceItems): EstimateResult {
+  const scopeError=validateDetailedScope(input);
+  if(scopeError) throw new Error(scopeError.message);
   const projectTypes = [...new Set(input.projectTypes?.length ? input.projectTypes : [input.projectType])];
   const rawLines = buildLines(input, catalog);
   const coefficient = regionCoefficient() * pricingCoefficients.access[input.access ?? "simple"] * pricingCoefficients.urgency[input.urgency];
@@ -197,6 +261,10 @@ export function estimateProject(input: EstimateInput, catalog: PriceItem[] = pri
   const maturityScore = Math.min(100, 35 + (input.city ? 10 : 0) + (input.surface || input.quantity || input.windowItems?.length ? 15 : 0) + (input.urgency !== "info" ? 15 : 0) + (input.projectType !== "other" ? 15 : 0) + (input.projectType === "global" && input.energy?.annualConsumption ? 10 : 0));
   const durationMap: Record<ProjectType, string> = { windows: "1 a 8 jours selon les ouvrants", insulation: "2 a 5 semaines", electricity: "3 jours a 3 semaines", plumbing: "1 a 10 jours", global: "6 a 16 semaines", hvac: "1 a 5 jours", kitchen_bath: "2 a 5 semaines", roofing: "2 jours a 4 semaines", other: "A preciser apres echange" };
   const roadmap: string[] = projectTypes.includes("global") ? ["Releve logement et analyse des consommations", "Priorisation isolation, ventilation et chauffage", "Chiffrage des variantes et verification technique", "Planning des lots et suivi des consommations"] : ["Validation des quantites et des supports", "Choix des materiels ou equivalents", "Visite technique et devis detaille", "Planification puis suivi de chantier"];
+  const detailedAssumptions: string[] = [];
+  if(projectTypes.includes("electricity")) detailedAssumptions.push(input.electricalMode==="pack" ? electricalPacks[input.electricalPack??"room"].label+". Quantités incluses, sans forfait m² ; seules les options explicites de tableau s’ajoutent." : input.electricalMode==="items" ? "Électricité à la carte : seules les quantités et le tableau explicitement choisis sont chiffrés, sans forfait au m²." : "Électricité historique : budget au m² et équipements complémentaires, périmètre à valider avant devis.");
+  if(projectTypes.includes("plumbing")) detailedAssumptions.push(input.plumbingMode==="bathroom_pack" ? "Pack sanitaires : une douche, un meuble simple vasque et un WC à poser, fourniture et pose sur attentes existantes. Sols/murs et nouveau réseau exclus sauf lignes explicites." : input.plumbingMode==="items" ? "Plomberie à la carte : fourniture et pose séparées, aucune distribution globale ajoutée automatiquement. La dépose courante est comprise dans les lignes de pose ; une dépose seule concerne un autre appareil." : "Plomberie historique : distribution au forfait et sanitaires, périmètre à valider avant devis.");
+  if(projectTypes.includes("kitchen_bath") && input.roomType!=="kitchen" && input.bathroomMode==="standard_pack") detailedAssumptions.push("Pack salle de bain : une douche, un meuble simple vasque, un WC à poser. Sol et murs uniquement selon les surfaces déclarées ; réseau neuf, électricité et étanchéité de douche italienne exclus.");
   return {
     low, mid, high, duration: projectTypes.map((type) => durationMap[type]).join(" + "), complexity: coefficient > 1.45 || projectTypes.includes("global") || projectTypes.length > 2 ? "complexe" : coefficient > 1.15 ? "standard" : "simple", maturityScore, lines,
     tvaRate: vatRates.length === 1 && typeof vatRates[0] === "number" ? vatRates[0] : null,
@@ -207,6 +275,6 @@ export function estimateProject(input: EstimateInput, catalog: PriceItem[] = pri
     ],
     roadmap,
     roi: energy,
-    assumptions: ["Prix indicatifs à confirmer avec les fournisseurs, le métré et la visite technique.", "Catalogue calibre pour l'Ile-de-France, sans majoration de zone supplementaire. Les coefficients d'acces et de delai sont appliques aux lignes. TVA a confirmer, aides non deduites.", ...(projectTypes.includes("global") && projectTypes.length > 1 ? ["Global combine : seuls les lots detailles et la coordination sont chiffres ; les autres travaux ne sont pas inclus."] : []), "Les aides publiques ne sont pas déduites automatiquement car leurs règles évoluent.", ...(energy ? ["Le ROI énergie est une pré-étude fondée sur la consommation déclarée, le coût annuel fourni par le client et des gains théoriques ; il doit être confirmé par un audit."] : [])]
+    assumptions: [...detailedAssumptions, "Prix indicatifs à confirmer avec les fournisseurs, le métré et la visite technique.", "Catalogue calibre pour l'Ile-de-France, sans majoration de zone supplementaire. Les coefficients d'acces et de delai sont appliques aux lignes. TVA a confirmer, aides non deduites.", ...(projectTypes.includes("global") && projectTypes.length > 1 ? ["Global combine : seuls les lots detailles et la coordination sont chiffres ; les autres travaux ne sont pas inclus."] : []), "Les aides publiques ne sont pas déduites automatiquement car leurs règles évoluent.", ...(energy ? ["Le ROI énergie est une pré-étude fondée sur la consommation déclarée, le coût annuel fourni par le client et des gains théoriques ; il doit être confirmé par un audit."] : [])]
   };
 }

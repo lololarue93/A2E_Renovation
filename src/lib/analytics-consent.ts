@@ -52,7 +52,31 @@ export function setAnalyticsPreference(choice: AnalyticsPreference["choice"], no
 
 export function hasAnalyticsConsent() { return !blockedForCurrentPage && readAnalyticsPreference()?.choice === "accepted"; }
 
+export const CLIENT_ANALYTICS_EVENTS = ["page_view", "cta_click", "phone_click", "quote_started", "quote_step_viewed", "pdf_downloaded", "gallery_opened", "gallery_comparison_used", "gallery_estimate_clicked"] as const;
+export type ClientAnalyticsEvent = typeof CLIENT_ANALYTICS_EVENTS[number];
+export function isClientAnalyticsEvent(event: string): event is ClientAnalyticsEvent { return (CLIENT_ANALYTICS_EVENTS as readonly string[]).includes(event); }
+export function isAnalyticsSessionId(value: unknown): value is string {
+  return typeof value === "string" && (/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value) || /^a2e-\d{13}-[a-z0-9]{10}$/.test(value));
+}
+
+// Store route families, never query strings, project references or dynamic identifiers.
+export function safeAnalyticsPath(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.length > 240 || value.includes("?") || value.includes("#")) return undefined;
+  if (["/", "/tarifs", "/realisations", "/politique-confidentialite", "/aides", "/services", "/mentions-legales", "/simulateur", "/contact", "/equipe", "/local"].includes(value)) return value;
+  if (/^\/services\/[a-z0-9-]+\/?$/.test(value)) return "/services";
+  if (/^\/local\/[a-z0-9-]+\/?$/.test(value)) return "/local";
+  return undefined;
+}
+
+export function validAnalyticsLabel(event: string, label: unknown) {
+  if (event === "quote_step_viewed") return typeof label === "string" && ["selection", "details", "budget", "contact"].includes(label);
+  if (event.startsWith("gallery_")) return label === "published" || label === "inspiration";
+  return true;
+}
+
 export function safeAnalyticsLabel(event: string, label?: string) {
+  if (event === "quote_step_viewed" || event.startsWith("gallery_")) return validAnalyticsLabel(event, label) ? label : undefined;
+  if (event === "lead_submitted") return label === "contact" ? "contact" : "simulateur";
   if (event === "page_view") return undefined;
   if (event === "phone_click") return "Appel A2E";
   if (event === "quote_started") return "Premier choix simulateur";

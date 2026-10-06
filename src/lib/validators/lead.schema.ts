@@ -9,6 +9,7 @@ export const leadSchema = z.object({
   consent: z.literal(true),
   input: estimateInputSchema,
   sessionId: z.string().max(80).optional(),
+  analyticsConsent: z.boolean().optional(),
   result: z.object({
     low: z.number(),
     mid: z.number(),

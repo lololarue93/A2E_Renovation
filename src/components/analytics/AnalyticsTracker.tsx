@@ -3,14 +3,14 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { AnalyticsPreferences } from "./AnalyticsPreferences";
-import { ANALYTICS_CONSENT_EVENT, ANALYTICS_CONSENT_KEY, ANALYTICS_SESSION_KEY, clearAnalyticsSession, hasAnalyticsConsent, safeAnalyticsLabel } from "@/lib/analytics-consent";
+import { ANALYTICS_CONSENT_EVENT, ANALYTICS_CONSENT_KEY, ANALYTICS_SESSION_KEY, clearAnalyticsSession, hasAnalyticsConsent, isAnalyticsSessionId, isClientAnalyticsEvent, safeAnalyticsLabel, safeAnalyticsPath, validAnalyticsLabel } from "@/lib/analytics-consent";
 
 export function getSessionId(): string | undefined {
   if (typeof window === "undefined" || window.location.pathname.startsWith("/admin") || !hasAnalyticsConsent()) { clearAnalyticsSession(); return undefined; }
   try {
     const current = window.sessionStorage.getItem(ANALYTICS_SESSION_KEY);
-    if (current) return current;
-    const value = typeof globalThis.crypto?.randomUUID === "function" ? globalThis.crypto.randomUUID() : `a2e-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+    if (isAnalyticsSessionId(current)) return current;
+    const value = typeof globalThis.crypto?.randomUUID === "function" ? globalThis.crypto.randomUUID() : `a2e-${Date.now()}-${Math.random().toString(36).slice(2, 12).padEnd(10, "0")}`;
     window.sessionStorage.setItem(ANALYTICS_SESSION_KEY, value);
     return value;
   } catch { return undefined; }
@@ -18,9 +18,11 @@ export function getSessionId(): string | undefined {
 
 export function track(event: string, label?: string) {
   if (typeof window === "undefined" || window.location.pathname.startsWith("/admin") || !hasAnalyticsConsent()) { clearAnalyticsSession(); return; }
-  if (!["page_view", "cta_click", "phone_click", "quote_started", "pdf_downloaded"].includes(event)) return;
+  if (!isClientAnalyticsEvent(event) || !validAnalyticsLabel(event, label)) return;
   try {
-    const payload = JSON.stringify({ event, label: safeAnalyticsLabel(event, label), path: window.location.pathname, sessionId: getSessionId(), analyticsConsent: true });
+    const path = safeAnalyticsPath(window.location.pathname), sessionId = getSessionId();
+    if (!path || !sessionId) return;
+    const payload = JSON.stringify({ event, label: safeAnalyticsLabel(event, label), path, sessionId, analyticsConsent: true });
     if (navigator.sendBeacon && navigator.sendBeacon("/api/analytics", new Blob([payload], { type: "application/json" }))) return;
     void fetch("/api/analytics", { method: "POST", headers: { "content-type": "application/json" }, body: payload, keepalive: true }).catch(() => undefined);
   } catch { /* Optional measurement must not affect the public journey. */ }

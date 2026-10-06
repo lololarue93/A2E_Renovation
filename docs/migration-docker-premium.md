@@ -69,6 +69,12 @@ neufs. Format custom et restauration : documentations officielles
    **Re-pull image / Pull latest images**, selon la version de Portainer. Le pull
    tire le tag precise ; ne pas utiliser `latest` pour selectionner une version.
 6. Attendre `migrate` et `media-init` en **Exited (0)**, puis SQL et web healthy.
+7. Maintenir l'acces public en maintenance. Depuis l'admin de la nouvelle image,
+   revoir puis importer seulement `docs/prix-detail-a-la-carte-2026.csv` (25
+   references nouvelles). Ajuster les prix, inclusions, materiels et TVA aux
+   conditions A2E ; confirmer la relecture. Ne pas importer le fichier complet
+   de 80 references de demonstration dans un catalogue existant.
+8. Tester les lots a la carte, packs, tableaux et PDF avant de rouvrir le trafic.
 
 Le passage par `migrate` est **obligatoire pour cette version**. La migration
 `20261006180000_price_item_centimes` convertit les trois prix unitaires
@@ -79,9 +85,22 @@ Prevoir la maintenance pendant ce changement de schema et conserver la sauvegard
 prise avant son application. Ne pas demarrer seulement l'image web en sautant le
 service de migration.
 
+La migration additive `20261006223000_lead_crm_followup` cree `company`,
+`nextAction`, `nextActionAt`, `crmVersion` et la table `LeadActivity`. Les anciens
+dossiers et notes restent disponibles. Elle est necessaire pour la base de
+prospection et les compteurs de relances ; le workflow CI applique les migrations
+sur PostgreSQL de test, mais aucun deploy SQL/NAS n'a ete execute localement.
+
 Le migrator applique `prisma migrate deploy`, puis cree seulement les donnees
 absentes. Les prix personnalises et reglages existants sont preserves. Le seed
 historique remplace des donnees : **ne pas lancer `prisma:seed` en production**.
+Les 25 nouvelles references detaillees sont exclues du bootstrap automatique :
+ce sont des hypotheses visibles dans l'aperçu local et un fichier a revoir,
+pas des tarifs entreprise approuves. Leur activation necessite l'import admin
+explicite ci-dessus. Sans elles, le nouveau simulateur signale un tarif manquant,
+sans remplacer le catalogue SQL par les valeurs de demonstration. Ne pas utiliser
+l'ancienne image/client Prisma apres conversion des types de prix ; l'import
+se fait sur la nouvelle image, sous maintenance, avant l'ouverture publique.
 Ne jamais lancer `prisma migrate dev` en production. `media-init` change seulement
 les droits du volume uploads pour l'utilisateur node 1000, sans effacer de fichier.
 

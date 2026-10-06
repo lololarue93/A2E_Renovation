@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "../src/lib/db/prisma";
 import { POST } from "../src/app/api/analytics/route";
 import { getSessionId, track } from "../src/components/analytics/AnalyticsTracker";
-import { ANALYTICS_CONSENT_KEY, ANALYTICS_SESSION_KEY, analyticsPreferenceExpiresAt, parseAnalyticsPreference, setAnalyticsPreference } from "../src/lib/analytics-consent";
+import { ANALYTICS_CONSENT_KEY, ANALYTICS_SESSION_KEY, analyticsPreferenceExpiresAt, isAnalyticsSessionId, parseAnalyticsPreference, setAnalyticsPreference } from "../src/lib/analytics-consent";
 
 class MemoryStorage {
   values = new Map<string, string>(); writes = 0; blocked = false;
@@ -35,17 +35,25 @@ async function main() {
     assert.deepEqual(Object.keys(preference).sort(), ["choice", "decidedAt"], "Seule la preference et sa date sont conservees durablement");
     assert.equal(setAnalyticsPreference("accepted"), true);
     const id = getSessionId(); assert.ok(id); assert.equal(getSessionId(), id); assert.equal(browser.sessionStorage.writes, 1);
+    assert.ok(isAnalyticsSessionId(id));
     track("page_view"); track("pdf_downloaded", "A2E-CLIENT-PRIVATE-000001"); track("cta_click", "Client Prive client@example.test 0100000000");
     assert.equal(beacons.length, 3);
     const payloads = await Promise.all(beacons.map(async (body) => JSON.parse(await body.text())));
     assert.equal(payloads[0].analyticsConsent, true); assert.equal(payloads[0].sessionId, id);
     assert.equal(payloads[1].label, "Pre-devis telecharge"); assert.equal(payloads[2].label, "Navigation vers projet");
     assert.ok(!JSON.stringify(payloads).includes("CLIENT-PRIVATE")); assert.ok(!JSON.stringify(payloads).includes("client@example.test"));
-    setAnalyticsPreference("refused"); track("phone_click"); assert.equal(getSessionId(), undefined); assert.equal(beacons.length, 3);
+    track("quote_step_viewed", "budget"); track("gallery_opened", "published"); track("gallery_comparison_used", "inspiration"); track("gallery_estimate_clicked", "published");
+    assert.equal(beacons.length, 7);
+    track("quote_step_viewed", "client@example.test"); track("gallery_opened", "chantier-prive"); track("lead_submitted", "simulateur"); assert.equal(beacons.length, 7, "Labels fermes et conversions serveur seulement");
+    browser.location.pathname = "/services/electricite"; track("page_view");
+    assert.equal(JSON.parse(await beacons[7].text()).path, "/services", "Les segments dynamiques ne sont pas conserves");
+    browser.location.pathname = "/contact/client-prive"; track("page_view"); assert.equal(beacons.length, 8);
+    browser.location.pathname = "/";
+    setAnalyticsPreference("refused"); track("phone_click"); assert.equal(getSessionId(), undefined); assert.equal(beacons.length, 8);
     setAnalyticsPreference("accepted"); browser.localStorage.blocked = true;
-    assert.equal(setAnalyticsPreference("refused"), false); assert.equal(getSessionId(), undefined); track("page_view"); assert.equal(beacons.length, 3, "Un retrait bloque localement reste effectif sur la page");
+    assert.equal(setAnalyticsPreference("refused"), false); assert.equal(getSessionId(), undefined); track("page_view"); assert.equal(beacons.length, 8, "Un retrait bloque localement reste effectif sur la page");
     browser.localStorage.blocked = false; setAnalyticsPreference("accepted"); browser.location.pathname = "/admin";
-    assert.equal(getSessionId(), undefined); track("page_view"); assert.equal(beacons.length, 3);
+    assert.equal(getSessionId(), undefined); track("page_view"); assert.equal(beacons.length, 8);
   } finally {
     if (windowDescriptor) Object.defineProperty(globalThis, "window", windowDescriptor); else Reflect.deleteProperty(globalThis, "window");
     if (navigatorDescriptor) Object.defineProperty(globalThis, "navigator", navigatorDescriptor); else Reflect.deleteProperty(globalThis, "navigator");
@@ -63,9 +71,17 @@ async function main() {
     assert.equal(reads, 0); assert.equal(writes, 0, "Sans accord explicite, aucune lecture ou ecriture en base");
     assert.equal((await POST(request({ analyticsConsent: true, event: "page_view", path: "/admin" }))).status, 400); assert.equal(reads, 0);
     assert.equal((await POST(request({ analyticsConsent: true, event: "page_view", path: "/contact?email=prive" }))).status, 400); assert.equal(reads, 0);
-    assert.equal((await POST(request({ analyticsConsent: true, event: "pdf_downloaded", path: "/simulateur", sessionId: "test-session", label: "client@example.test", metadata: { private: "private" } }))).status, 204);
+    const sessionId = "01234567-89ab-4cde-8fab-0123456789ab";
+    for (const body of [{ event: "quote_step_viewed", label: "client@example.test" }, { event: "gallery_opened", label: "private" }, { event: "lead_submitted", label: "simulateur" }]) assert.equal((await POST(request({ ...body, analyticsConsent: true, path: "/simulateur", sessionId }))).status, 400);
+    await POST(request({ analyticsConsent: true, event: "page_view", path: "/", sessionId: "client-name" })); assert.equal(reads, 0); assert.equal(writes, 0);
+    assert.equal((await POST(request({ analyticsConsent: true, event: "page_view", path: "/", padding: "x".repeat(8001) }))).status, 413);
+    assert.equal((await POST(request({ analyticsConsent: true, event: "pdf_downloaded", path: "/simulateur", sessionId, label: "client@example.test", metadata: { private: "private" } }))).status, 204);
     assert.equal(writes, 1); assert.equal(recorded.label, "Pre-devis telecharge"); assert.equal(recorded.referrer, "https://example.test"); assert.equal(recorded.metadata, undefined);
-    enabled = false; await POST(request({ analyticsConsent: true, event: "page_view", path: "/" })); assert.equal(writes, 1);
+    for (const [event, labels] of [["quote_step_viewed", ["selection", "details", "budget", "contact"]], ["gallery_opened", ["published", "inspiration"]], ["gallery_comparison_used", ["published", "inspiration"]], ["gallery_estimate_clicked", ["published", "inspiration"]]] as const) for (const label of labels) {
+      assert.equal((await POST(request({ analyticsConsent: true, event, label, path: "/realisations", sessionId }))).status, 204); assert.equal(recorded.event, event); assert.equal(recorded.label, label); assert.equal(recorded.metadata, undefined);
+    }
+    assert.equal(writes, 11);
+    enabled = false; await POST(request({ analyticsConsent: true, event: "page_view", path: "/", sessionId })); assert.equal(writes, 11);
   } finally {
     prisma.siteSettings.findUnique = settingsRead; prisma.siteEvent.create = eventCreate;
     if (databaseUrl === undefined) delete process.env.DATABASE_URL; else process.env.DATABASE_URL = databaseUrl;

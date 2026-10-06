@@ -30,18 +30,22 @@ async function main() {
   assert.equal(summarizeDashboardEvents([], period.keys).completionRate, null, "Un denominateur absent n'est pas transforme en zero pour cent");
 
   const originalEmail = process.env.ADMIN_EMAIL, originalPassword = process.env.ADMIN_PASSWORD;
-  const original = { transaction: prisma.$transaction, leadFindMany: prisma.lead.findMany, leadCount: prisma.lead.count, auditFindMany: prisma.auditLog.findMany, realisationFindMany: prisma.realisation.findMany, settingsFindMany: prisma.siteSettings.findMany, settingsUpsert: prisma.siteSettings.upsert, auditCreate: prisma.auditLog.create };
+  const original = { transaction: prisma.$transaction, leadFindMany: prisma.lead.findMany, leadCount: prisma.lead.count, leadGroupBy: prisma.lead.groupBy, auditFindMany: prisma.auditLog.findMany, realisationFindMany: prisma.realisation.findMany, settingsFindMany: prisma.siteSettings.findMany, settingsUpsert: prisma.siteSettings.upsert, auditCreate: prisma.auditLog.create };
   const authorization = `Basic ${Buffer.from("admin@example.test:test-admin-only").toString("base64")}`;
   const request = (path: string, method = "GET", body?: unknown, authenticated = true) => new NextRequest(`http://localhost/api/admin/${path}`, { method, headers: { ...(authenticated ? { authorization } : {}), "content-type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
   const audits: { id: string; action: string; entityId?: string; payload?: { note?: string }; createdAt: Date }[] = [];
   let status = "nouveau";
+  let hasRealisationPhoto = false;
   const realisations: { id: string; title: string; active: boolean; [key: string]: unknown }[] = [];
   const settingsRows = new Map<string, unknown>();
   const mockAudit = async (input: { data: typeof audits[number] }) => { const item = { ...input.data, id: `audit-${audits.length}`, createdAt: new Date() }; audits.push(item); return item; };
   const tx = {
     lead: { findUnique: async (input: { where: { id: string } }) => input.where.id === "lead-1" ? { status } : null, updateMany: async (input: { where: { status: string }; data: { status: string } }) => { if (input.where.status !== status) return { count: 0 }; status = input.data.status; return { count: 1 }; } },
     auditLog: { create: mockAudit },
-    realisation: { create: async (input: { data: { title: string; active: boolean } }) => { const item = { id: `real-${realisations.length + 1}`, ...input.data }; realisations.push(item); return item; }, findUnique: async (input: { where: { id: string } }) => realisations.find((item) => item.id === input.where.id) ?? null, upsert: async (input: { where: { id: string }; update: { title: string; active: boolean }; create: { id: string; title: string; active: boolean } }) => { const existing = realisations.find((item) => item.id === input.where.id); if (existing) { Object.assign(existing, input.update); return existing; } realisations.push(input.create); return input.create; } }
+    leadActivity: { create: async (input: unknown) => ({ id: "activity-test", input }) },
+    mediaAsset: { findFirst: async () => hasRealisationPhoto ? { id: "photo-test" } : null },
+    realisationPhoto: { findFirst: async () => null },
+    realisation: { create: async (input: { data: { title: string; active: boolean } }) => { const item = { id: `real-${realisations.length + 1}`, ...input.data }; realisations.push(item); return item; }, findUnique: async (input: { where: { id: string } }) => realisations.find((item) => item.id === input.where.id) ?? null, update: async (input: { where: { id: string }; data: { title: string; active: boolean } }) => { const existing = realisations.find((item) => item.id === input.where.id); if (!existing) throw new Error("Missing test item"); Object.assign(existing, input.data); return existing; } }
   };
   try {
     delete process.env.ADMIN_EMAIL; delete process.env.ADMIN_PASSWORD;
@@ -55,6 +59,7 @@ async function main() {
     prisma.$transaction = (async (operation: unknown) => typeof operation === "function" ? operation(tx) : Promise.all(operation as Promise<unknown>[])) as typeof prisma.$transaction;
     prisma.lead.findMany = (async () => [{ id: "lead-1", name: "Client test", status, consent: true, estimates: [], project: null }]) as unknown as typeof prisma.lead.findMany;
     prisma.lead.count = (async () => 1) as typeof prisma.lead.count;
+    prisma.lead.groupBy = (async () => [{ sourceLead: "website", _count: { _all: 1 } }]) as unknown as typeof prisma.lead.groupBy;
     prisma.auditLog.findMany = (async () => audits.filter((item) => item.action === "lead.note_added")) as unknown as typeof prisma.auditLog.findMany;
     assert.equal((await patchLead(request("leads", "PATCH", { id: "lead-1", status: "a_rappeler", previousStatus: "nouveau", note: "Visite a confirmer" }))).status, 200);
     const savedLead = await (await getLeads(request("leads?id=lead-1&consent=all"))).json();
@@ -65,11 +70,14 @@ async function main() {
     assert.equal((await patchLead(request("leads", "PATCH", { id: "missing", status: "nouveau", previousStatus: "nouveau" }))).status, 404);
 
     prisma.realisation.findMany = (async () => realisations) as unknown as typeof prisma.realisation.findMany;
+    prisma.siteSettings.findMany = (async () => [...settingsRows.entries()].map(([key, value]) => ({ key, value }))) as unknown as typeof prisma.siteSettings.findMany;
     const project = { title: "Projet de verification", city: "Paris", type: "Cuisine", description: "Description de chantier autorise pour verification.", duration: "", budget: "Sur etude", tags: ["Cuisine"], active: false };
     assert.equal((await createRealisation(request("realisations", "POST", { ...project, title: "" }))).status, 400);
     const createdResponse = await createRealisation(request("realisations", "POST", project)); assert.equal(createdResponse.status, 201);
     const created = (await createdResponse.json()).realisation;
     assert.equal(created.active, false);
+    assert.equal((await updateRealisation(request("realisations", "PUT", { ...project, id: created.id, active: true }))).status, 400, "Une fiche sans photo reste en brouillon");
+    hasRealisationPhoto = true;
     assert.equal((await updateRealisation(request("realisations", "PUT", { ...project, id: created.id, active: true }))).status, 200);
     const catalog = await (await getRealisations(request("realisations"))).json();
     assert.equal(catalog.realisations.find((item: { id: string }) => item.id === created.id).active, true, "La publication reste visible apres relecture");
@@ -91,7 +99,7 @@ async function main() {
     prisma.siteSettings.findMany = (async () => { throw new Error("Database unavailable"); }) as typeof prisma.siteSettings.findMany;
     assert.equal((await getSettings(request("settings"))).status, 503, "Une panne n'est pas presentee comme des reglages initiaux");
   } finally {
-    prisma.$transaction = original.transaction; prisma.lead.findMany = original.leadFindMany; prisma.lead.count = original.leadCount; prisma.auditLog.findMany = original.auditFindMany; prisma.realisation.findMany = original.realisationFindMany; prisma.siteSettings.findMany = original.settingsFindMany; prisma.siteSettings.upsert = original.settingsUpsert; prisma.auditLog.create = original.auditCreate;
+    prisma.$transaction = original.transaction; prisma.lead.findMany = original.leadFindMany; prisma.lead.count = original.leadCount; prisma.lead.groupBy = original.leadGroupBy; prisma.auditLog.findMany = original.auditFindMany; prisma.realisation.findMany = original.realisationFindMany; prisma.siteSettings.findMany = original.settingsFindMany; prisma.siteSettings.upsert = original.settingsUpsert; prisma.auditLog.create = original.auditCreate;
     if (originalEmail === undefined) delete process.env.ADMIN_EMAIL; else process.env.ADMIN_EMAIL = originalEmail;
     if (originalPassword === undefined) delete process.env.ADMIN_PASSWORD; else process.env.ADMIN_PASSWORD = originalPassword;
     await prisma.$disconnect();

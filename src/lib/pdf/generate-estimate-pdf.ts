@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { getSiteContactSettings } from "@/lib/settings/site-contact-settings";
 import { siteSettings } from "@/lib/site-data";
+import { shortPriceUnit } from "../pricing/units";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage } from "pdf-lib";
 
 export type PdfEstimateLine = {
@@ -123,7 +124,7 @@ export async function generateEstimatePdf(input: EstimatePdfInput) {
     page.drawRectangle({ x: 42, y: y - rowHeight + 8, width: 511, height: rowHeight, color: pearl });
     labelLines.forEach((value, index) => page.drawText(value, { x: 50, y: y - index * 12, size: 8.5, font: bold, color: ink }));
     detailLines.forEach((value, index) => page.drawText(value, { x: 50, y: y - labelLines.length * 12 - index * 11 - 2, size: 7.8, font, color: ink }));
-    drawRight(`${line.quantity.toLocaleString("fr-FR", { maximumFractionDigits: 4 }).replace(/[\u202f\u00a0]/g, " ")} ${line.unit}`, 337, y, 47, 8);
+    drawRight(`${line.quantity.toLocaleString("fr-FR", { maximumFractionDigits: 4 }).replace(/[\u202f\u00a0]/g, " ")} ${shortPriceUnit(line.unit)}`, 337, y, 47, 8);
     drawRight(euro(line.low), 400, y, 61, 7.8);
     drawRight(euro(line.mid), 473, y, 65, 7.8, bold);
     drawRight(euro(line.high), 546, y, 66, 7.8);

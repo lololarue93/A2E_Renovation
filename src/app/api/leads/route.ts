@@ -9,6 +9,7 @@ import { sendTelegramLead } from "@/lib/webhooks/send-telegram-lead";
 import { sendLeadNotification } from "@/lib/email/send-lead-notification";
 import { getNotificationSettings } from "@/lib/settings/notification-settings";
 import { generateEstimatePdf } from "@/lib/pdf/generate-estimate-pdf";
+import { isAnalyticsSessionId } from "@/lib/analytics-consent";
 export const dynamic="force-dynamic";
 export async function POST(request:NextRequest) {
  const raw=await request.text();
@@ -33,7 +34,7 @@ export async function POST(request:NextRequest) {
  const estimateId=saved.estimates[0].id;
  const settings=await getNotificationSettings();
  await emitWebhook("lead.created",{leadId:saved.id,estimateId,typeProjet:saved.typeProjet}).catch(()=>undefined);
- if(settings.trackingEnabled) await prisma.siteEvent.create({data:{event:"lead_submitted",path:"/simulateur",label:saved.typeProjet,sessionId:lead.sessionId,metadata:{leadId:saved.id}}}).catch(()=>undefined);
+ if(settings.trackingEnabled && lead.analyticsConsent === true && isAnalyticsSessionId(lead.sessionId)) await prisma.siteEvent.create({data:{event:"lead_submitted",path:"/simulateur",label:"simulateur",sessionId:lead.sessionId}}).catch(()=>undefined);
  let pdf:Uint8Array|undefined;
  if(settings.events.leadCreated) {
   pdf=await generateEstimatePdf({name:lead.name,email:lead.email,phone:lead.phone,city:input.city,number,createdAt:saved.createdAt,...result,discountPercent:settings.signatureDiscountPercent,discountDays:settings.signatureWindowDays}).catch(()=>undefined);

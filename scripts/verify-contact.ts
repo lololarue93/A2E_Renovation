@@ -11,6 +11,8 @@ async function main() {
   let saved: Record<string, unknown> | null = null;
   const records = new Map<string, { name: string; status: string; payload?: unknown }>();
   let sequence = 0;
+  let analyticsWrites = 0;
+  let analyticsData: Record<string, unknown> = {};
   const input = { name: "Client de verification", email: "Client@exemple.fr", phone: "01 00 00 00 00", city: "Paris", type: "other", message: "Je souhaite presenter un projet de renovation.", consent: true, website: "", sessionId: "test-session" };
   const request = (body: unknown) => new NextRequest("http://localhost/api/contact", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   try {
@@ -24,7 +26,7 @@ async function main() {
     prisma.lead.create = (async (args: { data: Record<string, unknown> }) => { saved = args.data; return { id: "contact-test" }; }) as unknown as typeof prisma.lead.create;
     // Les envois sont desactives dans le double de test : aucune requete fournisseur.
     prisma.siteSettings.findUnique = (async () => ({ value: { events: { leadCreated: false }, recipients: ["equipe@example.test"], trackingEnabled: true } })) as unknown as typeof prisma.siteSettings.findUnique;
-    prisma.siteEvent.create = (async () => ({})) as unknown as typeof prisma.siteEvent.create;
+    prisma.siteEvent.create = (async (args: { data: Record<string, unknown> }) => { analyticsWrites++; analyticsData = args.data; return {}; }) as unknown as typeof prisma.siteEvent.create;
     prisma.webhookEvent.create = (async (args: { data: { id?: string; name: string; status: string } }) => { const id = args.data.id ?? `logged-${sequence++}`; if (records.has(id)) throw new Error("duplicate"); records.set(id, args.data); return { id, ...args.data }; }) as unknown as typeof prisma.webhookEvent.create;
     prisma.webhookEvent.update = (async (args: { where: { id: string }; data: { status: string; payload?: unknown } }) => { const previous = records.get(args.where.id)!; records.set(args.where.id, { ...previous, ...args.data }); return args.data; }) as unknown as typeof prisma.webhookEvent.update;
     const response = await POST(request(input)); assert.equal(response.status, 201);
@@ -32,9 +34,18 @@ async function main() {
     const data = saved as unknown as { sourceLead: string; email: string; consent: boolean; budget?: unknown; estimates?: unknown; project: { create: { details: { message: string } } } };
     assert.equal(data.sourceLead, "website-contact"); assert.equal(data.email, "client@exemple.fr"); assert.equal(data.consent, true);
     assert.equal(data.budget, undefined); assert.equal(data.estimates, undefined); assert.equal(data.project.create.details.message, input.message);
+    assert.equal(analyticsWrites, 0, "CRM conserve sans accord distinct de mesure");
     assert.equal(records.get("notification-contact-contact-test")?.status, "skipped");
     const duplicate = await sendContactNotification({ leadId: "contact-test", name: input.name, email: input.email, phone: input.phone, type: input.type, message: input.message });
     assert.equal(duplicate.reason, "already_attempted_or_log_unavailable");
+    const sessionId = "01234567-89ab-4cde-8fab-0123456789ab";
+    assert.equal((await POST(request({ ...input, sessionId, analyticsConsent: true }))).status, 201); assert.equal(analyticsWrites, 1);
+    assert.deepEqual(analyticsData, { event: "lead_submitted", path: "/contact", label: "contact", sessionId }, "Aucun identifiant client, type de travaux ou montant dans l'audience");
+    assert.equal((await POST(request({ ...input, sessionId, analyticsConsent: false }))).status, 201); assert.equal(analyticsWrites, 1);
+    assert.equal((await POST(request({ ...input, sessionId: "client-private", analyticsConsent: true }))).status, 201); assert.equal(analyticsWrites, 1);
+    assert.equal((await POST(request({ ...input, sessionId, analyticsConsent: "true" }))).status, 400);
+    prisma.siteEvent.create = (async () => { throw new Error("Measurement unavailable"); }) as unknown as typeof prisma.siteEvent.create;
+    assert.equal((await POST(request({ ...input, sessionId, analyticsConsent: true }))).status, 201, "Une panne de mesure n'annule pas la demande enregistree");
     prisma.lead.create = (async () => { throw new Error("Database unavailable"); }) as unknown as typeof prisma.lead.create;
     assert.equal((await POST(request(input))).status, 503);
   } finally {

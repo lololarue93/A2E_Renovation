@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" role="img" aria-labelledby="title desc">
+  <title id="title">Pièce avant projet, illustration de démonstration</title>
+  <desc id="desc">Une pièce fictive aux murs usés et au sol carrelé. Ce dessin ne représente pas un chantier A2E.</desc>
+  <defs>
+    <linearGradient id="wall" x2="0" y2="1"><stop stop-color="#dbd8cc"/><stop offset="1" stop-color="#c5c2b6"/></linearGradient>
+    <linearGradient id="side" x2="1" y2="1"><stop stop-color="#c8c4b9"/><stop offset="1" stop-color="#b8b5aa"/></linearGradient>
+    <linearGradient id="floor" x2="0" y2="1"><stop stop-color="#9a9a8f"/><stop offset="1" stop-color="#b4b1a4"/></linearGradient>
+    <linearGradient id="glass" x2="0" y2="1"><stop stop-color="#c5d7d0"/><stop offset="1" stop-color="#e2e5d7"/></linearGradient>
+  </defs>
+  <path fill="#e6e2d6" d="M0 0H900L700 80H205Z"/>
+  <path fill="url(#side)" d="M0 0L205 80V425L0 600Z"/>
+  <path fill="#b5b5a9" d="M900 0L700 80V425L900 600Z"/>
+  <path fill="url(#wall)" d="M205 80H700V425H205Z"/>
+  <path fill="url(#floor)" d="M205 425H700L900 600H0Z"/>
+  <g stroke="#696e642e" fill="none" stroke-width="2">
+    <path d="M0 600L310 425M165 600L365 425M345 600L430 425M545 600L500 425M735 600L570 425M900 600L630 425"/>
+    <path d="M160 462H742M105 505H793M40 563H860"/>
+  </g>
+  <path fill="#9f9c8d" d="M414 124H606V351H414Z"/>
+  <path fill="url(#glass)" d="M425 135H595V337H425Z"/>
+  <path fill="#8faaa0" d="M425 295L459 274L488 291L520 262L559 280L595 270V337H425Z"/>
+  <path fill="#bdc8b6" d="M425 316L463 300L510 315L552 305L595 309V337H425Z"/>
+  <g stroke="#d5d1c2" stroke-width="7"><path d="M510 135V337M425 233H595"/></g>
+  <path fill="#a7a293" d="M405 344H615V357H405Z"/>
+  <path fill="#b8b3a350" d="M425 357L595 357L823 580L384 516Z"/>
+  <path fill="#b7b3a8" opacity=".6" d="M253 141L273 126L299 135L292 168L270 175L251 159ZM632 351L664 339L683 367L666 397L630 388Z"/>
+  <g stroke="#9b9a8b" fill="none" stroke-width="2"><path d="M334 80L328 119L344 143L337 169M337 169L351 190M337 169L320 183"/><path d="M694 266L680 282L685 313L674 325"/></g>
+  <path stroke="#aaa897" stroke-width="9" d="M205 425H700"/>
+  <path stroke="#a3a092" stroke-width="5" d="M205 80H700"/>
+  <path fill="#817c6b" opacity=".2" d="M207 508L409 492L465 517L271 546Z"/>
+  <g stroke="#817f6d" stroke-linejoin="round" fill="none">
+    <path stroke-width="9" d="M232 488L295 251L357 473M270 490L327 263L396 470"/>
+    <path stroke-width="7" d="M285 292L339 293M274 331L351 333M262 373L364 375M251 416L376 418M240 459L389 461"/>
+  </g>
+  <path fill="#b5a88c" d="M562 447L626 428L689 448L624 468Z"/>
+  <path fill="#a3977c" d="M562 447L624 468V534L562 511Z"/>
+  <path fill="#c4b69a" d="M624 468L689 448V511L624 534Z"/>
+  <path stroke="#887e69" stroke-width="2" fill="none" d="M595 438L658 459L658 520"/>
+  <path stroke="#5d6b6130" fill="none" stroke-width="2" d="M205 80V425M700 80V425"/>
+</svg>
