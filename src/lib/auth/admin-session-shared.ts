@@ -9,7 +9,19 @@ export function adminConfig() {
 
 export function adminSessionKey() {
   const config = adminConfig();
-  return config ? JSON.stringify(["a2e-admin-v1", process.env.AUTH_SECRET ?? "", config.email, config.password]) : null;
+  return config ? JSON.stringify(["a2e-admin-v1", process.env.AUTH_SECRET ?? "", config.email, config.password]) : process.env.AUTH_SECRET || null;
+}
+
+export type DatabaseSession = { userId: string; version: number; expires: number; nonce: string };
+export function databaseSessionParts(token: string | undefined, now = Date.now()) {
+  if (!token || !/^v2\.[a-zA-Z0-9_-]{1,1024}\.[a-f0-9]{64}$/.test(token)) return null;
+  const [, encoded, signature] = token.split(".");
+  try {
+    const value = JSON.parse(atob(encoded.replace(/-/g, "+").replace(/_/g, "/"))) as Partial<DatabaseSession>;
+    const remaining = Number(value.expires) - Math.floor(now / 1000);
+    if (typeof value.userId !== "string" || !/^[a-zA-Z0-9_-]{1,100}$/.test(value.userId) || !Number.isInteger(value.version) || Number(value.version) < 0 || typeof value.nonce !== "string" || !/^[a-f0-9]{32}$/.test(value.nonce) || !Number.isInteger(value.expires) || remaining <= 0 || remaining > adminSessionSeconds + 60) return null;
+    return { payload: `v2.${encoded}`, signature, identity: value as DatabaseSession };
+  } catch { return null; }
 }
 
 export function sessionParts(token: string | undefined, now = Date.now()) {

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdmin } from "@/lib/auth/require-admin";
+import { requireAdmin, getRequestActor } from "@/lib/auth/require-admin";
 import { changeGalleryManifest, gallerySettingsKey, readGalleryManifest } from "@/lib/realisations/gallery";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +15,7 @@ const patchFields = z.object({ id: z.string().min(1).max(100), title: z.string()
 const failure = (message: string, status = 503) => NextResponse.json({ error: message }, { status });
 
 export async function GET(request: NextRequest) {
-  const denied = requireAdmin(request); if (denied) return denied;
+  const denied = await requireAdmin(request); if (denied) return denied;
   try {
     const [assets, realisations, settings] = await Promise.all([
       prisma.mediaAsset.findMany({ orderBy: { createdAt: "asc" }, include: { realisation: { select: { title: true, active: true } } } }),
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const denied = requireAdmin(request); if (denied) return denied;
+  const denied = await requireAdmin(request); if (denied) return denied;
   const form = await request.formData().catch(() => null);
   if (!form) return failure("Le fichier n'a pas pu être lu. Réessayez l'envoi.", 400);
   const file = form.get("file");
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       const assets = [...projectAssets, created];
       const manifest = changeGalleryManifest(readGalleryManifest(row?.value, assets), assets, created.id, { role: parsed.data.role });
       await tx.siteSettings.upsert({ where: { key: gallerySettingsKey(existing.id) }, create: { key: gallerySettingsKey(existing.id), value: manifest }, update: { value: manifest } });
-      await tx.auditLog.create({ data: { actor: process.env.ADMIN_EMAIL, action: "media.uploaded", entity: "MediaAsset", entityId: created.id, payload: { realisationId: existing.id, role: parsed.data.role } } });
+      await tx.auditLog.create({ data: { actor: await getRequestActor(request), action: "media.uploaded", entity: "MediaAsset", entityId: created.id, payload: { realisationId: existing.id, role: parsed.data.role } } });
       return created;
     }, { isolationLevel: "Serializable" });
     return NextResponse.json({ ok: true, asset }, { status: 201 });
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const denied = requireAdmin(request); if (denied) return denied;
+  const denied = await requireAdmin(request); if (denied) return denied;
   const parsed = patchFields.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return failure("Les informations du média sont invalides.", 400);
   try {
@@ -80,7 +80,7 @@ export async function PATCH(request: NextRequest) {
       if (parsed.data.comparisonConfirmed && !manifest.comparisonConfirmed) return { error: "Associez deux photos différentes, l'une Avant et l'autre Après, avant de confirmer la comparaison.", status: 400 };
       const updated = await tx.mediaAsset.update({ where: { id: asset.id }, data: { title: parsed.data.title, alt: parsed.data.alt } });
       await tx.siteSettings.upsert({ where: { key }, create: { key, value: manifest }, update: { value: manifest } });
-      await tx.auditLog.create({ data: { actor: process.env.ADMIN_EMAIL, action: "media.updated", entity: "MediaAsset", entityId: asset.id, payload: { realisationId: asset.realisationId, role: manifest.roles[asset.id], cover: manifest.coverId === asset.id, order: manifest.order, comparisonConfirmed: manifest.comparisonConfirmed } } });
+      await tx.auditLog.create({ data: { actor: await getRequestActor(request), action: "media.updated", entity: "MediaAsset", entityId: asset.id, payload: { realisationId: asset.realisationId, role: manifest.roles[asset.id], cover: manifest.coverId === asset.id, order: manifest.order, comparisonConfirmed: manifest.comparisonConfirmed } } });
       return { asset: updated, manifest };
     }, { isolationLevel: "Serializable" });
     if ("error" in result) return failure(result.error!, result.status);
@@ -89,7 +89,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const denied = requireAdmin(request); if (denied) return denied;
+  const denied = await requireAdmin(request); if (denied) return denied;
   const id = request.nextUrl.searchParams.get("id");
   if (!id || id.length > 100) return failure("Média introuvable.", 400);
   try {
@@ -108,7 +108,7 @@ export async function DELETE(request: NextRequest) {
         await tx.siteSettings.upsert({ where: { key }, create: { key, value: manifest }, update: { value: manifest } });
       }
       await tx.mediaAsset.delete({ where: { id } });
-      await tx.auditLog.create({ data: { actor: process.env.ADMIN_EMAIL, action: "media.deleted", entity: "MediaAsset", entityId: id, payload: { realisationId: asset.realisationId } } });
+      await tx.auditLog.create({ data: { actor: await getRequestActor(request), action: "media.deleted", entity: "MediaAsset", entityId: id, payload: { realisationId: asset.realisationId } } });
       return { asset };
     }, { isolationLevel: "Serializable" });
     if (!result) return failure("Ce média n'existe plus.", 404);

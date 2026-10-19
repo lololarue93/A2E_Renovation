@@ -5,6 +5,7 @@ const reasons: Record<string, string> = { event_disabled: "Evenement desactive",
 export function notificationLogDetails(payload: unknown) {
   const value = payload && typeof payload === "object" && !Array.isArray(payload) ? payload as Record<string, unknown> : {};
   const count = (key: string) => typeof value[key] === "number" && Number.isInteger(value[key]) && Number(value[key]) >= 0 ? Number(value[key]) : null;
-  const reason = typeof value.reason === "string" ? reasons[value.reason] ?? (/^provider_http_\d{3}$/.test(value.reason) ? `Fournisseur : HTTP ${value.reason.slice(-3)}` : "Detail technique non classe") : null;
+  const reason = typeof value.reason === "string" ? reasons[value.reason] ?? (/^(mail_|smtp_)/.test(value.reason) ? mailReasonMessage(value.reason) : /^provider_http_\d{3}$/.test(value.reason) ? `Fournisseur : HTTP ${value.reason.slice(-3)}` : "Detail technique non classe") : null;
   return { recipientCount: count("recipientCount"), acceptedCount: count("acceptedCount"), rejectedCount: count("rejectedCount"), reason, leadId: typeof value.leadId === "string" && /^[-_a-zA-Z0-9]{1,100}$/.test(value.leadId) ? value.leadId : null };
 }
+import { mailReasonMessage } from "@/lib/email/mail-errors";

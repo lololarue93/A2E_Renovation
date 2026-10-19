@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdmin } from "@/lib/auth/require-admin";
+import { requireAdmin, getRequestActor } from "@/lib/auth/require-admin";
 import { calculateQuote, validateQuote } from "@/lib/pricing/quote-workspace";
 
 export const dynamic = "force-dynamic";
 const prefix = "quote.";
 
 export async function GET(request: NextRequest) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdmin(request);
   if (denied) return denied;
   if (!process.env.DATABASE_URL) return NextResponse.json({ error: "Base de donnees non configuree. Le brouillon local reste disponible." }, { status: 503 });
   try {
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdmin(request);
   if (denied) return denied;
   if (!process.env.DATABASE_URL) return NextResponse.json({ error: "Base de donnees non configuree. Le brouillon n'est pas enregistre sur le serveur." }, { status: 503 });
   if (Number(request.headers.get("content-length")) > 512_000) return NextResponse.json({ error: "Document trop volumineux" }, { status: 413 });
@@ -42,7 +42,7 @@ export async function PUT(request: NextRequest) {
     const value = JSON.parse(JSON.stringify(quote));
     const item = await prisma.$transaction(async (tx) => {
       const saved = await tx.pricingSettings.upsert({ where: { key: prefix + quote.id }, update: { value }, create: { key: prefix + quote.id, value } });
-      await tx.auditLog.create({ data: { actor: "admin", action: "quote.saved", entity: "PricingSettings", entityId: saved.id, payload: { number: quote.number, lines: quote.lines.length } } });
+      await tx.auditLog.create({ data: { actor: await getRequestActor(request), action: "quote.saved", entity: "PricingSettings", entityId: saved.id, payload: { number: quote.number, lines: quote.lines.length } } });
       return saved;
     });
     return NextResponse.json({ ok: true, quote, totals: calculateQuote(quote), updatedAt: item.updatedAt });

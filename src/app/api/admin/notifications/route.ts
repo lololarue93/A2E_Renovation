@@ -6,7 +6,7 @@ import { notificationEvents, notificationStatuses, notificationLogDetails } from
 
 export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
-  const denied = requireAdmin(request); if (denied) return denied;
+  const denied = await requireAdmin(request, "mail:read"); if (denied) return denied;
   const status = request.nextUrl.searchParams.get("status") || "";
   if (status && !notificationStatuses.includes(status as typeof notificationStatuses[number])) return NextResponse.json({ error: "Statut de notification invalide." }, { status: 400 });
   const rawPage = Number(request.nextUrl.searchParams.get("page") || 1);

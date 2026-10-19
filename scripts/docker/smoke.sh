@@ -15,7 +15,7 @@ export DATABASE_URL='postgresql://a2e:a2e-smoke-private-password@postgres:5432/a
 export NEXT_PUBLIC_SITE_URL="http://127.0.0.1:$A2E_PORT" ADMIN_EMAIL=smoke@example.invalid
 export ADMIN_PASSWORD=a2e-smoke-admin-password AUTH_SECRET=a2e-smoke-auth-secret-not-for-production
 # Do not inherit real notification credentials from a workstation .env.
-export BREVO_API_KEY= BREVO_SENDER_EMAIL= SMTP_USER= SMTP_PASSWORD= TELEGRAM_BOT_TOKEN= TELEGRAM_CHAT_ID=
+export BREVO_API_KEY= BREVO_SENDER_EMAIL= SMTP_USER= SMTP_PASSWORD= MAIL_ENCRYPTION_KEY= TELEGRAM_BOT_TOKEN= TELEGRAM_CHAT_ID=
 export TELEGRAM_LEADS_ENABLED=false
 compose=(docker compose -p "$project" -f docker-compose.yml -f docker-compose.local.yml)
 restore_verifier=
@@ -110,7 +110,19 @@ const prisma = new PrismaClient();
   assert.equal(rereadCrm.activities.length, 2, 'CRM retry must not duplicate activities');
   assert.ok(rereadCrm.activities.some(activity => activity.kind === 'call' && activity.note === crmPatch.activity.note));
   assert.deepEqual(await Promise.all([prisma.webhookEvent.count(), prisma.siteEvent.count()]), effectCounts, 'Manual CRM must not trigger notifications or analytics');
-  await writeFile('/app/public/uploads/a2e-verification.json', JSON.stringify({ price: { key: price.key, low: edited.low, mid: edited.mid, high: edited.high }, detailedPriceKeys, crm: { id: crm.id, status: rereadCrm.status, crmVersion: rereadCrm.crmVersion, activities: rereadCrm.activities.length }, estimate: { id: stored.id, mid: stored.mid, lines: stored.lines.length }, image: { name: '00000000-0000-4000-8000-000000000001.png', sha256: createHash('sha256').update(image).digest('hex') } }));
+  const accountInput = { name: 'Smoke secretary', email: 'secretary-smoke@example.invalid', role: 'secretary', password: 'a2e-smoke-team-password' };
+  const accountResponse = await fetch('http://127.0.0.1:3000/api/admin/users', { method: 'POST', headers: crmHeaders, body: JSON.stringify(accountInput) }); assert.equal(accountResponse.status, 201);
+  const account = (await accountResponse.json()).user, accountSql = await prisma.user.findUnique({ where: { id: account.id } }); assert.ok(await require('bcryptjs').compare(accountInput.password, accountSql.passwordHash));
+  const login = await fetch('http://127.0.0.1:3000/api/auth/admin', { method: 'POST', headers: { origin: 'http://127.0.0.1:3000', 'content-type': 'application/json' }, body: JSON.stringify({ email: accountInput.email, password: accountInput.password }) }); assert.equal(login.status, 200);
+  const teamHeaders = { cookie: login.headers.getSetCookie().find(value => value.startsWith('a2e_admin_session=')).split(';')[0], origin: 'http://127.0.0.1:3000', 'content-type': 'application/json' };
+  const me = await fetch('http://127.0.0.1:3000/api/auth/me', { headers: teamHeaders }); assert.equal(me.status, 200); assert.equal((await me.json()).user.role, 'secretary');
+  assert.equal((await fetch('http://127.0.0.1:3000/api/admin/users', { headers: teamHeaders })).status, 403); assert.equal((await fetch('http://127.0.0.1:3000/api/admin/pricing', { method: 'PUT', headers: teamHeaders, body: '{}' })).status, 403);
+  const connector = { id: '00000000-0000-4000-8000-000000000003', name: 'Smoke blocked SMTP', provider: 'smtp', preset: 'custom', host: 'smoke.invalid', port: 465, security: 'tls', username: 'smoke@example.invalid', fromEmail: 'smoke@example.invalid', fromName: 'Smoke', enabled: true, secret: 'a2e-smoke-mail-secret-not-for-production' };
+  const connectorResponse = await fetch('http://127.0.0.1:3000/api/admin/mail/connectors', { method: 'PUT', headers: crmHeaders, body: JSON.stringify({ version: 0, defaultConnectorId: connector.id, connectors: [connector] }) }); assert.equal(connectorResponse.status, 200);
+  const connectorView = await connectorResponse.json(); assert.ok(!JSON.stringify(connectorView).includes(connector.secret)); assert.ok(!JSON.stringify(connectorView).includes('ciphertext'));
+  const mailStore = await prisma.siteSettings.findUnique({ where: { key: 'mail.connectors.v1' } }), sealed = mailStore.value.connectors[0].sealedSecret; assert.ok(sealed.ciphertext); assert.ok(!JSON.stringify(mailStore.value).includes(connector.secret));
+  const team = { id: account.id, name: account.name, email: account.email, role: account.role, active: true, sessionVersion: 0 }, mail = { id: connector.id, secretSha256: createHash('sha256').update([sealed.version, sealed.iv, sealed.tag, sealed.ciphertext].join('|')).digest('hex') };
+  await writeFile('/app/public/uploads/a2e-verification.json', JSON.stringify({ team, mail, price: { key: price.key, low: edited.low, mid: edited.mid, high: edited.high }, detailedPriceKeys, crm: { id: crm.id, status: rereadCrm.status, crmVersion: rereadCrm.crmVersion, activities: rereadCrm.activities.length }, estimate: { id: stored.id, mid: stored.mid, lines: stored.lines.length }, image: { name: '00000000-0000-4000-8000-000000000001.png', sha256: createHash('sha256').update(image).digest('hex') } }));
 })().catch(error => { console.error(error.message); process.exitCode = 1; }).finally(() => prisma.$disconnect());
 NODE
 "${compose[@]}" run --rm --no-deps migrate
@@ -143,6 +155,11 @@ const prisma = new PrismaClient();
   assert.equal(crm.status, marker.crm.status);
   assert.equal(crm.crmVersion, marker.crm.crmVersion);
   assert.equal(crm.activities.length, marker.crm.activities);
+  const account = await prisma.user.findUnique({ where: { id: marker.team.id } }); for (const field of ['name', 'email', 'role', 'active', 'sessionVersion']) assert.equal(account[field], marker.team[field], 'Bootstrap/restart changed team account');
+  const login = await fetch('http://127.0.0.1:3000/api/auth/admin', { method: 'POST', headers: { origin: 'http://127.0.0.1:3000', 'content-type': 'application/json' }, body: JSON.stringify({ email: marker.team.email, password: 'a2e-smoke-team-password' }) }); assert.equal(login.status, 200);
+  const me = await fetch('http://127.0.0.1:3000/api/auth/me', { headers: { cookie: login.headers.getSetCookie().find(value => value.startsWith('a2e_admin_session=')).split(';')[0] } }); assert.equal(me.status, 200); assert.equal((await me.json()).user.role, marker.team.role);
+  const mailStore = await prisma.siteSettings.findUnique({ where: { key: 'mail.connectors.v1' } }), connector = mailStore.value.connectors.find(item => item.id === marker.mail.id), sealed = connector.sealedSecret;
+  assert.equal(createHash('sha256').update([sealed.version, sealed.iv, sealed.tag, sealed.ciphertext].join('|')).digest('hex'), marker.mail.secretSha256, 'Encrypted SMTP secret changed after bootstrap/restart');
   const image = await readFile('/app/public/uploads/' + marker.image.name);
   if (createHash('sha256').update(image).digest('hex') !== marker.image.sha256) throw new Error('Media bytes changed after restart');
 })().catch(error => { console.error(error.message); process.exitCode = 1; }).finally(() => prisma.$disconnect());
@@ -180,6 +197,12 @@ for (const field of ["key", "low", "mid", "high"]) assert.equal(restored.price[f
 assert.equal(restored.priceColumnType, "double precision");
 assert.equal(restored.priceMigrationApplied, true);
 assert.equal(restored.crmMigrationApplied, true);
+assert.equal(restored.userMigrationApplied, true);
+for (const field of ["id", "name", "email", "role", "active", "sessionVersion"]) assert.equal(restored.team[field], marker.team[field], "Restored team account changed");
+assert.ok(require("bcryptjs").compareSync("a2e-smoke-team-password", restored.team.passwordHash));
+assert.equal(restored.mail.defaultConnectorId, marker.mail.id); const connector = restored.mail.connectors.find(item => item.id === marker.mail.id), sealed = connector.sealedSecret;
+assert.equal(crypto.createHash("sha256").update([sealed.version, sealed.iv, sealed.tag, sealed.ciphertext].join("|")).digest("hex"), marker.mail.secretSha256, "Restored encrypted SMTP secret changed");
+console.log("Restored team account and encrypted SMTP credential verified without exposing credentials.");
 assert.equal(restored.prices.filter(item => marker.detailedPriceKeys.includes(item.key)).length, 0, "Unreviewed rates appeared during restore");
 const crm = restored.crm.find(item => item.id === marker.crm.id);
 assert.ok(crm, "Restored CRM prospect missing");
@@ -199,7 +222,10 @@ SELECT json_build_object(
   'estimates', (SELECT json_agg(json_build_object('id', e."id", 'mid', e."mid", 'lines', (SELECT count(*) FROM "EstimateLine" WHERE "estimateId" = e."id"))) FROM "Estimate" e),
   'priceColumnType', (SELECT data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'PriceItem' AND column_name = 'low'),
   'priceMigrationApplied', EXISTS(SELECT 1 FROM "_prisma_migrations" WHERE migration_name = '20261006180000_price_item_centimes' AND finished_at IS NOT NULL),
-  'crmMigrationApplied', EXISTS(SELECT 1 FROM "_prisma_migrations" WHERE migration_name = '20261006223000_lead_crm_followup' AND finished_at IS NOT NULL)
+  'crmMigrationApplied', EXISTS(SELECT 1 FROM "_prisma_migrations" WHERE migration_name = '20261006223000_lead_crm_followup' AND finished_at IS NOT NULL),
+  'userMigrationApplied', EXISTS(SELECT 1 FROM "_prisma_migrations" WHERE migration_name = '20261019200000_user_accounts' AND finished_at IS NOT NULL),
+  'team', (SELECT row_to_json(u) FROM "User" u WHERE u."email" = 'secretary-smoke@example.invalid'),
+  'mail', (SELECT "value" FROM "SiteSettings" WHERE "key" = 'mail.connectors.v1')
 );
 SQL
 printf 'Docker verification passed: Float/CRM migrations, pending detailed rates, centime admin PUT/GET, CRM create/update/conflict/reload/restart/restore, readiness, permissions, live media bytes, admin rejection, recomputed persisted lead/PDF, notification deduplication and backup.\n'

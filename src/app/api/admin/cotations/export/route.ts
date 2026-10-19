@@ -6,7 +6,7 @@ import { defaultSiteContactSettings, getSiteContactSettings } from "@/lib/settin
 
 export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdmin(request);
   if (denied) return denied;
   if (Number(request.headers.get("content-length")) > 512_000) return NextResponse.json({ error: "Document trop volumineux" }, { status: 413 });
   let quote;

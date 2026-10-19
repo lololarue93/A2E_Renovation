@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const tsx = require.resolve("tsx/cli");
-const checks = ["estimates", "estimator-flow", "detailed-pricing", "bootstrap", "quotations", "admin", "admin-auth", "admin-session", "admin-exports", "contact", "notifications", "analytics-consent", "lead-analytics", "dashboard-kpis", "gallery", "demo-projects", "crm", "reviews", "uploads", "pdf-layout"];
+const checks = ["estimates", "estimator-flow", "detailed-pricing", "bootstrap", "quotations", "admin", "admin-auth", "admin-session", "team-accounts", "admin-exports", "contact", "notifications", "mail-workspace", "analytics-consent", "lead-analytics", "dashboard-kpis", "gallery", "demo-projects", "crm", "reviews", "uploads", "pdf-layout"];
 for (const check of checks) {
   const result = spawnSync(process.execPath, [tsx, `scripts/verify-${check}.ts`], { stdio: "inherit", env: process.env });
   if (result.error || result.status !== 0) {

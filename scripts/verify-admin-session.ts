@@ -11,7 +11,7 @@ async function main() {
   const base = "https://a2e.example.test";
   const login = (password: string, extra: Record<string, string> = {}) => new NextRequest(`${base}/api/auth/admin`, { method: "POST", headers: { origin: base, "content-type": "application/json", ...extra }, body: JSON.stringify({ email: "equipe@example.test", password }) });
   try {
-    delete process.env.ADMIN_EMAIL; delete process.env.ADMIN_PASSWORD;
+    delete process.env.ADMIN_EMAIL; delete process.env.ADMIN_PASSWORD; delete process.env.AUTH_SECRET;
     assert.equal((await POST(login("fixture"))).status, 503);
     assert.equal((await middleware(new NextRequest(`${base}/admin/connexion`))).headers.get("x-middleware-next"), "1");
     process.env.ADMIN_EMAIL = "equipe@example.test"; process.env.ADMIN_PASSWORD = "fixture-longue-ete-€"; process.env.AUTH_SECRET = "fixture-auth-secret-long-only-for-tests"; process.env.NEXT_PUBLIC_SITE_URL = base;
@@ -28,17 +28,17 @@ async function main() {
     const token = response.cookies.get(adminCookieName)!.value;
     assert.ok(validAdminSession(token));
     const authenticated = new NextRequest(`${base}/api/admin/pricing`, { headers: { cookie: `${adminCookieName}=${token}` } });
-    assert.equal(requireAdmin(authenticated), null);
+    assert.equal(await requireAdmin(authenticated), null);
     assert.equal((await middleware(authenticated)).headers.get("x-middleware-next"), "1", "Signature Node reconnue par le middleware WebCrypto");
     const forged = token.slice(0, -1) + (token.endsWith("a") ? "b" : "a");
     assert.equal(validAdminSession(forged), false);
-    assert.equal(requireAdmin(new Request(`${base}/api/admin/leads`, { headers: { cookie: `${adminCookieName}=${forged}` } }))?.status, 401);
+    assert.equal((await requireAdmin(new Request(`${base}/api/admin/leads`, { headers: { cookie: `${adminCookieName}=${forged}` } })))?.status, 401);
     assert.equal(validAdminSession(createAdminSession(Date.now() - adminSessionSeconds * 1000)), false, "Session expiree refusee");
     assert.equal(validAdminSession(createAdminSession(Date.now() + 120_000)), false, "Date artificiellement lointaine refusee");
     const mutation = (origin?: string) => new Request(`${base}/api/admin/leads`, { method: "PATCH", headers: { cookie: `${adminCookieName}=${token}`, ...(origin ? { origin } : {}) } });
-    assert.equal(requireAdmin(mutation(base)), null);
-    assert.equal(requireAdmin(mutation("https://other.example"))?.status, 403);
-    assert.equal(requireAdmin(mutation())?.status, 403);
+    assert.equal(await requireAdmin(mutation(base)), null);
+    assert.equal((await requireAdmin(mutation("https://other.example")))?.status, 403);
+    assert.equal((await requireAdmin(mutation()))?.status, 403);
     process.env.ADMIN_PASSWORD += "-rotation";
     assert.equal(validAdminSession(token), false, "Rotation identifiants invalide les sessions");
     process.env.ADMIN_PASSWORD = "fixture-longue-ete-€";

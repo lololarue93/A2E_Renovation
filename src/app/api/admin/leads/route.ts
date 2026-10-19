@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { createHash } from "node:crypto";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdmin } from "@/lib/auth/require-admin";
+import { requireAdmin, getRequestActor } from "@/lib/auth/require-admin";
 import { leadStatuses } from "@/lib/admin/lead-status";
 import { crmActivityKinds, crmContactSchema, crmDateSchema, crmDueFilters, crmDueWhere, crmEditableContactSchema, crmNextActionDate } from "@/lib/admin/crm";
 
@@ -24,7 +24,7 @@ const createSchema = z.object({ requestId: z.string().uuid(), contact: crmContac
 const failure = (error: string, status = 503) => NextResponse.json({ error }, { status });
 
 export async function GET(request: NextRequest) {
-  const denied = requireAdmin(request); if (denied) return denied;
+  const denied = await requireAdmin(request); if (denied) return denied;
   const params = request.nextUrl.searchParams;
   const search = (params.get("search") ?? "").trim().slice(0, 100);
   const status = params.get("status"), due = params.get("due"), source = params.get("source"), consent = params.get("consent") ?? "all";
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const denied = requireAdmin(request); if (denied) return denied;
+  const denied = await requireAdmin(request); if (denied) return denied;
   const parsed = createSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return failure("Renseignez un nom ou une entreprise, un email ou téléphone valide, le type de projet et une origine. Vérifiez l’action et sa date.", 400);
   const { contact, requestId, nextAction, nextActionDate, note } = parsed.data;
@@ -72,8 +72,8 @@ export async function POST(request: NextRequest) {
         return { state: identical ? "existing" as const : "conflict" as const, lead: existing };
       }
       const created = await tx.lead.create({ data: { id, ...contact, name: contact.name || contact.company, company: contact.company || null, city: contact.city || null, nextAction: nextAction || null, nextActionAt: nextActionDate ? crmNextActionDate(nextActionDate) : null } });
-      if (note) await tx.leadActivity.create({ data: { leadId: id, kind: "note", note, occurredAt: new Date(), actor: process.env.ADMIN_EMAIL } });
-      await tx.auditLog.create({ data: { actor: process.env.ADMIN_EMAIL, action: "lead.manual_created", entity: "Lead", entityId: id, payload: { source: contact.sourceLead, consent: contact.consent, creationFingerprint } } });
+      if (note) await tx.leadActivity.create({ data: { leadId: id, kind: "note", note, occurredAt: new Date(), actor: await getRequestActor(request) } });
+      await tx.auditLog.create({ data: { actor: await getRequestActor(request), action: "lead.manual_created", entity: "Lead", entityId: id, payload: { source: contact.sourceLead, consent: contact.consent, creationFingerprint } } });
       return { state: "created" as const, lead: created };
     }, { isolationLevel: "Serializable" });
     if (result.state === "conflict") return NextResponse.json({ error: "La première création a déjà été enregistrée avec une saisie différente. Votre nouvelle saisie est conservée ; reprenez-la dans le dossier existant.", existingLeadId: result.lead.id }, { status: 409 });
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const denied = requireAdmin(request); if (denied) return denied;
+  const denied = await requireAdmin(request); if (denied) return denied;
   const parsed = updateSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return failure("Vérifiez les coordonnées, la prochaine action et la date de l’échange. Une note contient au maximum 2 000 caractères.", 400);
   const { id, status, previousStatus, expectedVersion, contact, nextAction, nextActionDate, note, activity } = parsed.data;
@@ -95,14 +95,14 @@ export async function PATCH(request: NextRequest) {
         ...(nextAction === undefined ? {} : { nextAction: nextAction || null, nextActionAt: nextActionDate ? crmNextActionDate(nextActionDate) : null })
       } });
       if (!updated.count) return { state: "conflict" as const };
-      if (status !== previousStatus) await tx.auditLog.create({ data: { actor: process.env.ADMIN_EMAIL, action: "lead.status_updated", entity: "Lead", entityId: id, payload: { previousStatus, status } } });
-      if (contact || nextAction !== undefined) await tx.auditLog.create({ data: { actor: process.env.ADMIN_EMAIL, action: "lead.crm_updated", entity: "Lead", entityId: id, payload: { nextActionDate, contactUpdated: !!contact } } });
+      if (status !== previousStatus) await tx.auditLog.create({ data: { actor: await getRequestActor(request), action: "lead.status_updated", entity: "Lead", entityId: id, payload: { previousStatus, status } } });
+      if (contact || nextAction !== undefined) await tx.auditLog.create({ data: { actor: await getRequestActor(request), action: "lead.crm_updated", entity: "Lead", entityId: id, payload: { nextActionDate, contactUpdated: !!contact } } });
       if (note) {
-        await tx.auditLog.create({ data: { actor: process.env.ADMIN_EMAIL, action: "lead.note_added", entity: "Lead", entityId: id, payload: { note } } });
-        await tx.leadActivity.create({ data: { leadId: id, kind: "note", note, occurredAt: new Date(), actor: process.env.ADMIN_EMAIL } });
+        await tx.auditLog.create({ data: { actor: await getRequestActor(request), action: "lead.note_added", entity: "Lead", entityId: id, payload: { note } } });
+        await tx.leadActivity.create({ data: { leadId: id, kind: "note", note, occurredAt: new Date(), actor: await getRequestActor(request) } });
       }
-      const savedActivity = activity ? await tx.leadActivity.create({ data: { leadId: id, kind: activity.kind, note: activity.note, occurredAt: new Date(activity.occurredAt), actor: process.env.ADMIN_EMAIL } }) : null;
-      if (savedActivity) await tx.auditLog.create({ data: { actor: process.env.ADMIN_EMAIL, action: "lead.activity_recorded", entity: "Lead", entityId: id, payload: { activityId: savedActivity.id, kind: activity!.kind } } });
+      const savedActivity = activity ? await tx.leadActivity.create({ data: { leadId: id, kind: activity.kind, note: activity.note, occurredAt: new Date(activity.occurredAt), actor: await getRequestActor(request) } }) : null;
+      if (savedActivity) await tx.auditLog.create({ data: { actor: await getRequestActor(request), action: "lead.activity_recorded", entity: "Lead", entityId: id, payload: { activityId: savedActivity.id, kind: activity!.kind } } });
       return { state: "saved" as const, crmVersion: (current.crmVersion ?? 0) + 1, activityId: savedActivity?.id };
     });
     if (result.state === "missing") return failure("Ce dossier n’existe plus.", 404);

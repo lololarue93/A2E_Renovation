@@ -6,7 +6,7 @@ import { csvCell } from "@/lib/pricing/catalog-transfer";
 
 export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
-  const denied = requireAdmin(request); if (denied) return denied;
+  const denied = await requireAdmin(request); if (denied) return denied;
   const filters = exportLeadFilters(request.nextUrl.searchParams);
   if (!filters.ok) return NextResponse.json({ error: filters.error }, { status: 400 });
   try {

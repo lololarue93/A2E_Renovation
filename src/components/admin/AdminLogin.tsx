@@ -21,7 +21,7 @@ export function AdminLogin({ next }: { next: string }) {
   }
   return <main id="main-content" className={styles.page}>
     <section className={styles.intro}><p className={styles.eyebrow}>A2E / Espace équipe</p><h1>Vos projets.<br />Un pilotage clair.</h1><p>Retrouvez les demandes, préparez vos cotations et faites vivre vos réalisations.</p><div className={styles.note}><LockKeyhole size={19} aria-hidden="true" /><span>Accès réservé à l’équipe A2E.</span></div></section>
-    <section className={styles.panel} aria-labelledby="admin-login-title"><p className={styles.eyebrow}>Connexion</p><h2 id="admin-login-title">Bienvenue dans votre espace.</h2><p className={styles.helper}>Utilisez les identifiants administrateur de votre installation.</p><form onSubmit={login} aria-busy={pending}>
+    <section className={styles.panel} aria-labelledby="admin-login-title"><p className={styles.eyebrow}>Connexion</p><h2 id="admin-login-title">Bienvenue dans votre espace.</h2><p className={styles.helper}>Utilisez votre adresse email et le mot de passe de votre compte A2E.</p><form onSubmit={login} aria-busy={pending}>
       <label htmlFor="admin-email">Identifiant<input id="admin-email" name="email" type="email" autoComplete="username" required maxLength={254} spellCheck={false} disabled={pending} /></label>
       <label htmlFor="admin-password">Mot de passe<input id="admin-password" name="password" type="password" autoComplete="current-password" required maxLength={1024} disabled={pending} /></label>
       {error && <p role="alert" className={styles.error}>{error}</p>}

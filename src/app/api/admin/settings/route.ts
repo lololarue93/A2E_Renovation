@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdmin } from "@/lib/auth/require-admin";
+import { requireAdmin, getRequestActor } from "@/lib/auth/require-admin";
 import { defaultNotificationSettings, type NotificationSettingsValue } from "@/lib/settings/notification-settings";
 import { defaultSiteContactSettings, type SiteContactSettings } from "@/lib/settings/site-contact-settings";
 import { emailTransportConfig } from "@/lib/email/transport-config";
+import { assertMailNotificationLimit, LISTS_KEY } from "@/lib/email/mail-store";
+import { MailServiceError } from "@/lib/email/mail-errors";
+import { mailApiError } from "@/lib/email/mail-api";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -24,7 +27,7 @@ const settingsSchema = z.object({
 }).strict();
 
 export async function GET(request: NextRequest) {
-  const denied = requireAdmin(request); if (denied) return denied;
+  const denied = await requireAdmin(request, "settings:read"); if (denied) return denied;
   try {
     const rows = await prisma.siteSettings.findMany({ where: { key: { in: ["notifications", "site_contact"] } } });
     const notificationRow = rows.find((row) => row.key === "notifications");
@@ -47,18 +50,24 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const denied = requireAdmin(request); if (denied) return denied;
+  const denied = await requireAdmin(request, "settings:write"); if (denied) return denied;
   const parsed = settingsSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Verifiez les emails (1 a 20 destinataires), le telephone, les URL et la validite commerciale (0 a 15 %, 1 a 60 jours).", details: parsed.error.flatten().fieldErrors }, { status: 400 });
   const { phone, instagram, facebook, linkedin, ...input } = parsed.data;
   const settings: NotificationSettingsValue = { ...input, leadEmail: input.leadEmail || input.recipients[0], recipients: [...new Set(input.recipients)] };
   const contact: SiteContactSettings = { phone, instagram, facebook, linkedin };
   try {
-    await prisma.$transaction([
-      prisma.siteSettings.upsert({ where: { key: "notifications" }, update: { value: settings }, create: { key: "notifications", value: settings } }),
-      prisma.siteSettings.upsert({ where: { key: "site_contact" }, update: { value: contact }, create: { key: "site_contact", value: contact } }),
-      prisma.auditLog.create({ data: { actor: process.env.ADMIN_EMAIL, action: "settings.updated", entity: "SiteSettings", entityId: "notifications", payload: { settings, contact } } })
-    ]);
+    const actor = await getRequestActor(request);
+    await prisma.$transaction(async tx => {
+      const lists = await tx.siteSettings.findUnique({ where: { key: LISTS_KEY } });
+      assertMailNotificationLimit(settings.recipients, lists?.value);
+      await tx.siteSettings.upsert({ where: { key: "notifications" }, update: { value: settings }, create: { key: "notifications", value: settings } });
+      await tx.siteSettings.upsert({ where: { key: "site_contact" }, update: { value: contact }, create: { key: "site_contact", value: contact } });
+      await tx.auditLog.create({ data: { actor, action: "settings.updated", entity: "SiteSettings", entityId: "notifications", payload: { settings, contact } } });
+    }, { isolationLevel: "Serializable" });
     return NextResponse.json({ ok: true, settings, contact });
-  } catch { return NextResponse.json({ error: "Enregistrement impossible. Les reglages n'ont pas ete confirmes en base." }, { status: 503 }); }
+  } catch (error) {
+    if (error instanceof MailServiceError) return mailApiError(error);
+    return NextResponse.json({ error: "Enregistrement impossible. Les reglages n'ont pas ete confirmes en base." }, { status: 503 });
+  }
 }

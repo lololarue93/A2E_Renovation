@@ -14,9 +14,9 @@ async function bootstrap() {
     throw new Error("Configure ADMIN_EMAIL and ADMIN_PASSWORD (12 characters minimum) before initialization.");
   }
 
-  const administrator = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  const administrator = await prisma.user.findFirst({ where: { email: { equals: email.trim().toLowerCase(), mode: "insensitive" } }, select: { id: true } });
   if (!administrator) {
-    await prisma.user.create({ data: { email, passwordHash: await bcrypt.hash(password, 12), role: "admin" } });
+    await prisma.user.create({ data: { email: email.trim().toLowerCase(), name: "Administrateur", passwordHash: await bcrypt.hash(password, 12), role: "admin" } });
   }
   const pendingDetailedKeys = new Set(detailedPriceKeys);
   for (const item of priceItems) {

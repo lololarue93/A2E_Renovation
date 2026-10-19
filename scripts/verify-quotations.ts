@@ -83,15 +83,15 @@ async function main() {
   assert.match(exportQuoteCsv(discountedQuote), /TOTAL APRES REMISE/);
   assert.match(exportQuoteCsv({ ...quote, basis: "unspecified" }), /TVA non calculee/);
 
-  const originalEmail = process.env.ADMIN_EMAIL, originalPassword = process.env.ADMIN_PASSWORD;
+  const originalEmail = process.env.ADMIN_EMAIL, originalPassword = process.env.ADMIN_PASSWORD, originalSecret = process.env.AUTH_SECRET;
   try {
-    delete process.env.ADMIN_EMAIL; delete process.env.ADMIN_PASSWORD;
-    assert.equal(requireAdmin(new Request("http://localhost/api/admin/pricing"))?.status, 503);
+    delete process.env.ADMIN_EMAIL; delete process.env.ADMIN_PASSWORD; delete process.env.AUTH_SECRET;
+    assert.equal((await requireAdmin(new Request("http://localhost/api/admin/pricing")))?.status, 503);
     process.env.ADMIN_EMAIL = "admin@example.com"; process.env.ADMIN_PASSWORD = "verification-secret";
-    assert.equal(requireAdmin(new Request("http://localhost/api/admin/pricing"))?.status, 401);
-    assert.equal(requireAdmin(new Request("http://localhost/api/admin/pricing", { headers: { authorization: "Basic malformed==" } }))?.status, 401);
+    assert.equal((await requireAdmin(new Request("http://localhost/api/admin/pricing")))?.status, 401);
+    assert.equal((await requireAdmin(new Request("http://localhost/api/admin/pricing", { headers: { authorization: "Basic malformed==" } })))?.status, 401);
     const authenticated = new Request("http://localhost/api/admin/pricing", { headers: { authorization: `Basic ${Buffer.from("admin@example.com:verification-secret").toString("base64")}` } });
-    assert.equal(requireAdmin(authenticated), null);
+    assert.equal(await requireAdmin(authenticated), null);
     for (const route of [getCatalog, putCatalog, postCatalog, importCatalog, getQuotes, putQuote, exportPdf]) {
       const response = await route(new NextRequest("http://localhost/api/admin/pricing"));
       assert.equal(response.status, 401, "Chaque route admin refuse l'acces meme sans middleware");
@@ -110,10 +110,11 @@ async function main() {
       assert.ok((await PDFDocument.load(await validPdf.arrayBuffer())).getPageCount() >= 1);
     } finally { if (originalDatabase === undefined) delete process.env.DATABASE_URL; else process.env.DATABASE_URL = originalDatabase; }
     process.env.ADMIN_PASSWORD = "change-me";
-    assert.equal(requireAdmin(authenticated)?.status, 503);
+    assert.equal((await requireAdmin(authenticated))?.status, 503);
   } finally {
     if (originalEmail === undefined) delete process.env.ADMIN_EMAIL; else process.env.ADMIN_EMAIL = originalEmail;
     if (originalPassword === undefined) delete process.env.ADMIN_PASSWORD; else process.env.ADMIN_PASSWORD = originalPassword;
+    if (originalSecret === undefined) delete process.env.AUTH_SECRET; else process.env.AUTH_SECRET = originalSecret;
   }
 
   const pdf = await PDFDocument.load(await generateWorkspaceQuote(quote, "01 00 00 00 00"));

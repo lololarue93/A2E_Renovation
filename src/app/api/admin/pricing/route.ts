@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdmin } from "@/lib/auth/require-admin";
+import { requireAdmin, getRequestActor } from "@/lib/auth/require-admin";
 import { validatePriceItem } from "@/lib/pricing/catalog-transfer";
 import { priceItems } from "@/lib/pricing/price-data";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdmin(request);
   if (denied) return denied;
   if (!process.env.DATABASE_URL) return NextResponse.json({ items: priceItems, source: "demo" });
   try {
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 }
 
 async function save(request: NextRequest, create: boolean) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdmin(request);
   if (denied) return denied;
   if (!process.env.DATABASE_URL) return NextResponse.json({ error: "Base de donnees non configuree. Aucun tarif n'a ete modifie." }, { status: 503 });
   let data;
@@ -26,7 +26,7 @@ async function save(request: NextRequest, create: boolean) {
   try {
     const item = await prisma.$transaction(async (tx) => {
       const result = create ? await tx.priceItem.create({ data: { ...data, active: true } }) : await tx.priceItem.upsert({ where: { key: data.key }, update: data, create: { ...data, active: true } });
-      await tx.auditLog.create({ data: { actor: "admin", action: create ? "pricing.created" : "pricing.updated", entity: "PriceItem", entityId: result.id, payload: { key: result.key, label: result.label } } });
+      await tx.auditLog.create({ data: { actor: await getRequestActor(request), action: create ? "pricing.created" : "pricing.updated", entity: "PriceItem", entityId: result.id, payload: { key: result.key, label: result.label } } });
       return result;
     });
     return NextResponse.json({ ok: true, item }, { status: create ? 201 : 200 });

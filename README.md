@@ -2,6 +2,15 @@
 
 Cette application Next.js rassemble la vitrine, le simulateur multi-postes, les reperes de prix, le contact, les possibilites d'aides et l'administration. Le depot actif est ce dossier A2E ; la copie presente dans son parent est historique.
 
+## Equipe et messagerie V1.1
+
+Les comptes nominatifs permettent de creer les acces des associes et du
+secretariat avec des droits serveur. Les connecteurs OVH, Gmail, autre SMTP et
+Brevo, les listes et les envois manuels se gerent dans l'admin.
+Voir [les comptes, connecteurs et la mise a jour](docs/notifications-email.md).
+La reception reelle demande un compte expediteur configure et un test depuis
+l'hebergement. Aucun secret de messagerie n'est fourni avec le code.
+
 ## Documentation V1
 
 Les [guides V1 illustres](docs/v1/README.md) presentent les fonctions disponibles,

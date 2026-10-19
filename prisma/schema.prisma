@@ -20,10 +20,14 @@ enum LeadStatus {
 
 model User {
   id           String   @id @default(cuid())
+  name         String   @default("")
   email        String   @unique
   passwordHash String
   role         String   @default("admin")
+  active       Boolean  @default(true)
+  sessionVersion Int    @default(0)
   createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
 }
 
 model Lead {

@@ -22,7 +22,10 @@ async function main() {
   class MemoryClient {
     store: Store;
     constructor() { this.store = pending; constructors++; }
-    user = { findUnique: async () => ({ id: "fixture-existing-admin" }) };
+    user = { findFirst: async (args: { where: { email: { equals: string; mode: string } } }) => {
+      assert.deepEqual(args.where.email, { equals: "admin@example.test", mode: "insensitive" }, "Le principal ENV est recherche sans casse ni espaces, sans recreer un ancien compte");
+      return { id: "fixture-existing-admin" };
+    } };
     priceItem = { upsert: async (args: Upsert) => {
       assert.deepEqual(args.update, {}, "Les tarifs entreprise existants ne doivent recevoir aucune modification");
       assert.ok(!detailed.has(args.where.key), "Une nouvelle hypothese detaillee ne doit pas etre activee automatiquement");
@@ -48,7 +51,7 @@ async function main() {
   }
   try {
     clientModule.exports = { ...clientExports, PrismaClient: MemoryClient };
-    process.env.ADMIN_EMAIL = "admin@example.test";
+    process.env.ADMIN_EMAIL = "  ADMIN@EXAMPLE.TEST  ";
     process.env.ADMIN_PASSWORD = "fixture-only-strong-password";
     const fresh = await run(new Map());
     assert.equal(fresh.created.length, 55); assert.equal(fresh.prices.size, 55);

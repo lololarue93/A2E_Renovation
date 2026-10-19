@@ -13,8 +13,9 @@ export function emailTransportConfig(provider: NotificationSettingsValue["provid
   const host = env.SMTP_HOST || (provider === "gmail" ? "smtp.gmail.com" : provider === "ovh" ? "ssl0.ovh.net" : "");
   if (!host || /[\s/@]/.test(host)) missing.push("SMTP_HOST");
   const port = Number(env.SMTP_PORT || 465);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) missing.push("SMTP_PORT");
+  if (![465, 587].includes(port)) missing.push("SMTP_PORT (465 TLS ou 587 STARTTLS)");
   if (env.SMTP_SECURE && !["true", "false"].includes(env.SMTP_SECURE)) missing.push("SMTP_SECURE");
+  if (env.SMTP_SECURE && (port === 465 && env.SMTP_SECURE !== "true" || port === 587 && env.SMTP_SECURE !== "false")) missing.push("SMTP_SECURE (coherent avec le port)");
   const from = env.SMTP_FROM || env.SMTP_USER || "";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(from)) missing.push("SMTP_FROM (ou SMTP_USER au format email)");
   return { configured: !missing.length, missing, host, port, secure: env.SMTP_SECURE ? env.SMTP_SECURE === "true" : port === 465, from };

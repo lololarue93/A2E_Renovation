@@ -40,6 +40,7 @@ async function main() {
   const settingsRows = new Map<string, unknown>();
   const mockAudit = async (input: { data: typeof audits[number] }) => { const item = { ...input.data, id: `audit-${audits.length}`, createdAt: new Date() }; audits.push(item); return item; };
   const tx = {
+    siteSettings: { findUnique: async (input: { where: { key: string } }) => settingsRows.has(input.where.key) ? { key: input.where.key, value: settingsRows.get(input.where.key) } : null, upsert: async (input: { where: { key: string }; update: { value: unknown } }) => { settingsRows.set(input.where.key, input.update.value); return input.update; } },
     lead: { findUnique: async (input: { where: { id: string } }) => input.where.id === "lead-1" ? { status } : null, updateMany: async (input: { where: { status: string }; data: { status: string } }) => { if (input.where.status !== status) return { count: 0 }; status = input.data.status; return { count: 1 }; } },
     auditLog: { create: mockAudit },
     leadActivity: { create: async (input: unknown) => ({ id: "activity-test", input }) },

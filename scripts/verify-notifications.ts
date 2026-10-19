@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import nodemailer from "nodemailer";
+import dns from "node:dns/promises";
 import { NextRequest } from "next/server";
 import { prisma } from "../src/lib/db/prisma";
 import { emailTransportConfig } from "../src/lib/email/transport-config";
@@ -21,13 +22,15 @@ async function main() {
   assert.deepEqual(notificationLogDetails({ reason: "secret-should-not-appear", recipientCount: -2, leadId: "<unsafe>" }), { recipientCount: null, acceptedCount: null, rejectedCount: null, reason: "Detail technique non classe", leadId: null });
   const keys = ["SMTP_USER", "SMTP_PASSWORD", "SMTP_HOST", "SMTP_PORT", "SMTP_SECURE", "SMTP_FROM", "BREVO_SENDER_EMAIL", "ADMIN_EMAIL", "ADMIN_PASSWORD", "DATABASE_URL"];
   const environment = new Map(keys.map(key => [key, process.env[key]]));
-  const original = { transport: nodemailer.createTransport, fetch: globalThis.fetch, create: prisma.webhookEvent.create, update: prisma.webhookEvent.update, settings: prisma.siteSettings.findUnique, estimate: prisma.estimate.findUnique };
+  const original = { transport: nodemailer.createTransport, lookup: dns.lookup, fetch: globalThis.fetch, create: prisma.webhookEvent.create, update: prisma.webhookEvent.update, settings: prisma.siteSettings.findUnique, estimate: prisma.estimate.findUnique };
   let mode = "all", sends = 0, closed = 0, sender = "", resultStatus = "";
   let lastMail: { replyTo?: string; html?: string; text?: string } = {};
   try {
     Object.assign(process.env, synthetic, { SMTP_HOST: "smtp.example.test", SMTP_FROM: "", SMTP_SECURE: "true", BREVO_SENDER_EMAIL: "different@example.test", ADMIN_EMAIL: "admin@example.test", ADMIN_PASSWORD: "notification-tests-only", DATABASE_URL: "postgresql://test-unused.invalid/test" });
+    dns.lookup = (async () => [{ address: "93.184.216.34", family: 4 }]) as unknown as typeof dns.lookup;
+    prisma.siteSettings.findUnique = (async () => null) as unknown as typeof prisma.siteSettings.findUnique;
     globalThis.fetch = (async () => { throw new Error("No external network allowed in test"); }) as typeof fetch;
-    nodemailer.createTransport = (() => ({ sendMail: async (input: { from: string; replyTo?: string; html?: string; text?: string }) => { sends++; sender = input.from; lastMail = input; if (mode === "error") throw new Error("Synthetic transport failure"); return { accepted: mode === "none" ? [] : mode === "partial" ? ["one@example.test"] : ["one@example.test", "two@example.test"], rejected: mode === "none" ? ["one@example.test", "two@example.test"] : mode === "partial" ? ["two@example.test"] : [] }; }, close: () => { closed++; } })) as unknown as typeof nodemailer.createTransport;
+    nodemailer.createTransport = (() => ({ sendMail: async (input: { from: { address: string }; replyTo?: string; html?: string; text?: string }) => { sends++; sender = input.from.address; lastMail = input; if (mode === "error") throw new Error("Synthetic transport failure"); return { accepted: mode === "none" ? [] : mode === "partial" ? ["one@example.test"] : ["one@example.test", "two@example.test"], rejected: mode === "none" ? ["one@example.test", "two@example.test"] : mode === "partial" ? ["two@example.test"] : [] }; }, close: () => { closed++; } })) as unknown as typeof nodemailer.createTransport;
     prisma.webhookEvent.update = (async (args: { data: { status: string } }) => { resultStatus = args.data.status; return {}; }) as unknown as typeof prisma.webhookEvent.update;
     const input = { recipients: ["one@example.test", "two@example.test"], subject: "Test only", text: "Synthetic message", html: "<p>Synthetic message</p>" };
     const complete = await deliverNotificationEmail(input, { provider: "smtp" }); assert.equal(complete.ok, true); assert.equal(complete.acceptedCount, 2); assert.equal(sender, "sender@example.test", "L'expediteur SMTP reste distinct du sender Brevo");
@@ -37,7 +40,7 @@ async function main() {
     mode = "error"; assert.equal((await deliverNotificationEmail(input, { provider: "smtp" })).reason, "transport_failed"); assert.equal(closed, sends, "Transport ferme pour succes, refus et panne");
     mode = "all";
     prisma.webhookEvent.create = (async () => ({})) as unknown as typeof prisma.webhookEvent.create;
-    prisma.siteSettings.findUnique = (async () => ({ value: { provider: "smtp", recipients: input.recipients, events: { leadCreated: true } } })) as unknown as typeof prisma.siteSettings.findUnique;
+    prisma.siteSettings.findUnique = (async (args: { where: { key: string } }) => args.where.key === "notifications" ? { value: { provider: "smtp", recipients: input.recipients, events: { leadCreated: true } } } : null) as unknown as typeof prisma.siteSettings.findUnique;
     const requestDetails = { message: "Projet sur mesure <script>", remarks: "<img src=x>\nAcces etroit", callbackRequested: true, callbackAvailability: "Mardi <b>18 h</b>" };
     assert.equal((await sendContactNotification({ leadId: "contact-double-only", name: "Client de test", email: "", phone: "0100000000", type: "other", ...requestDetails })).sent, true);
     assert.equal(lastMail.replyTo, undefined, "Sans email client le Reply-To est omis, jamais vide");
@@ -70,7 +73,7 @@ async function main() {
     const authorization = `Basic ${Buffer.from("admin@example.test:notification-tests-only").toString("base64")}`;
     assert.equal((await GET(new NextRequest("http://localhost/api/admin/notifications?status=invented", { headers: { authorization } }))).status, 400);
   } finally {
-    nodemailer.createTransport = original.transport; globalThis.fetch = original.fetch; prisma.webhookEvent.create = original.create; prisma.webhookEvent.update = original.update; prisma.siteSettings.findUnique = original.settings; prisma.estimate.findUnique = original.estimate;
+    nodemailer.createTransport = original.transport; dns.lookup = original.lookup; globalThis.fetch = original.fetch; prisma.webhookEvent.create = original.create; prisma.webhookEvent.update = original.update; prisma.siteSettings.findUnique = original.settings; prisma.estimate.findUnique = original.estimate;
     for (const [key, value] of environment) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
     await prisma.$disconnect();
   }

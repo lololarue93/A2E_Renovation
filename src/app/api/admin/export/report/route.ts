@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 // Standard PDF fonts support WinAnsi; keep untrusted names printable and bounded.
 const safeText = (value: string, max = 75) => value.replace(/[^\x20-\x7e\xa0-\xff]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 export async function GET(request: NextRequest) {
-  const denied = requireAdmin(request); if (denied) return denied;
+  const denied = await requireAdmin(request); if (denied) return denied;
   const filters = exportLeadFilters(request.nextUrl.searchParams);
   if (!filters.ok) return NextResponse.json({ error: filters.error }, { status: 400 });
   try {

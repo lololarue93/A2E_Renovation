@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdmin } from "@/lib/auth/require-admin";
+import { requireAdmin, getRequestActor } from "@/lib/auth/require-admin";
 import { gallerySettingsKey } from "@/lib/realisations/gallery";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ const fields = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const denied = requireAdmin(request); if (denied) return denied;
+  const denied = await requireAdmin(request); if (denied) return denied;
   try {
     const [items, settings] = await Promise.all([
       prisma.realisation.findMany({ orderBy: { createdAt: "desc" }, include: { media: { orderBy: { createdAt: "asc" } }, photos: { orderBy: { sortOrder: "asc" } } } }),
@@ -24,14 +24,14 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const denied = requireAdmin(request); if (denied) return denied;
+  const denied = await requireAdmin(request); if (denied) return denied;
   const parsed = fields.strict().safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Renseignez un titre, une ville, un type et une description. Vérifiez la longueur des champs et des tags." }, { status: 400 });
   if (parsed.data.active) return NextResponse.json({ error: "Créez d'abord la fiche en brouillon, puis ajoutez une photo avant de publier." }, { status: 400 });
   try {
     const item = await prisma.$transaction(async tx => {
       const created = await tx.realisation.create({ data: parsed.data });
-      await tx.auditLog.create({ data: { actor: process.env.ADMIN_EMAIL, action: "realisation.created", entity: "Realisation", entityId: created.id, payload: { title: created.title, active: false } } });
+      await tx.auditLog.create({ data: { actor: await getRequestActor(request), action: "realisation.created", entity: "Realisation", entityId: created.id, payload: { title: created.title, active: false } } });
       return created;
     });
     return NextResponse.json({ ok: true, realisation: item }, { status: 201 });
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const denied = requireAdmin(request); if (denied) return denied;
+  const denied = await requireAdmin(request); if (denied) return denied;
   const parsed = fields.extend({ id: z.string().min(1).max(100) }).strict().safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Fiche invalide. Titre, ville, type et description sont obligatoires." }, { status: 400 });
   const { id, ...data } = parsed.data;
@@ -55,7 +55,7 @@ export async function PUT(request: NextRequest) {
         if (!media && !photo) return { error: "Ajoutez au moins une photo avant de publier cette réalisation.", status: 400 };
       }
       const saved = await tx.realisation.update({ where: { id }, data });
-      await tx.auditLog.create({ data: { actor: process.env.ADMIN_EMAIL, action: "realisation.updated", entity: "Realisation", entityId: id, payload: { title: saved.title, active: saved.active } } });
+      await tx.auditLog.create({ data: { actor: await getRequestActor(request), action: "realisation.updated", entity: "Realisation", entityId: id, payload: { title: saved.title, active: saved.active } } });
       return { item: saved };
     }, { isolationLevel: "Serializable" });
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });

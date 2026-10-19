@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowUpRight, CircleAlert } from "lucide-react";
 import { prisma } from "@/lib/db/prisma";
 import { AdminWorkspace } from "@/components/admin/AdminWorkspace";
@@ -14,6 +15,11 @@ import { ReviewManager } from "@/components/admin/ReviewManager";
 import { leadStatusLabels } from "@/lib/admin/lead-status";
 import { dashboardPeriod, summarizeDashboardEvents } from "@/lib/admin/dashboard-metrics";
 import { crmDueWhere, crmSourceLabels } from "@/lib/admin/crm";
+import { getAdminPageIdentity } from "@/lib/admin/page-identity";
+import { hasPermission } from "@/lib/auth/permissions";
+import { AdminPermissionPanel } from "@/components/admin/AdminPermissionPanel";
+import { TeamAccounts } from "@/components/admin/TeamAccounts";
+import { MailWorkspace } from "@/components/admin/MailWorkspace";
 
 export const dynamic = "force-dynamic";
 async function loadDashboard(start: Date, end: Date, now: Date) {
@@ -23,7 +29,7 @@ async function loadDashboard(start: Date, end: Date, now: Date) {
     prisma.lead.count({ where: { createdAt: period } }),
     prisma.lead.groupBy({ by: ["status"], _count: { _all: true } }),
     prisma.lead.findMany({ orderBy: { createdAt: "desc" }, take: 5, select: { id: true, name: true, company: true, city: true, sourceLead: true, typeProjet: true, status: true, createdAt: true } }),
-    prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 15, select: { id: true, action: true, entity: true, entityId: true, createdAt: true } }),
+    prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 15, select: { id: true, action: true, entity: true, entityId: true, actor: true, createdAt: true } }),
     prisma.webhookEvent.groupBy({ by: ["status"], where: { name: { in: ["notification.leadCreated", "notification.pdfGenerated", "notification.contactCreated"] }, createdAt: period }, _count: { _all: true } }),
     prisma.siteSettings.findUnique({ where: { key: "notifications" }, select: { value: true } }),
     prisma.lead.count({ where: { sourceLead: { startsWith: "website" }, consent: true, createdAt: period } }),
@@ -36,6 +42,9 @@ async function loadDashboard(start: Date, end: Date, now: Date) {
 }
 
 export default async function AdminPage() {
+  const identity = await getAdminPageIdentity();
+  if (!identity) redirect("/admin/connexion?next=%2Fadmin");
+  const can = (permission: Parameters<typeof hasPermission>[1]) => hasPermission(identity.role, permission);
   const now = new Date();
   const { keys, start, end } = dashboardPeriod(now);
   const data = process.env.DATABASE_URL ? await loadDashboard(start, end, now).catch(() => null) : null;
@@ -57,6 +66,14 @@ export default async function AdminPage() {
       <section className="mt-7 border-y border-navy/10 py-5"><div className="flex items-center justify-between gap-3"><h2 className="text-xl font-bold text-navy">Derniers dossiers enregistrés</h2><a href="#pipeline" className="button-text">Tout voir <ArrowUpRight size={15} /></a></div><div className="mt-3 divide-y divide-navy/10">{data.recentLeads.length ? data.recentLeads.map((lead) => <a key={lead.id} href={`/admin?lead=${lead.id}#pipeline`} className="flex min-h-14 flex-wrap items-center justify-between gap-3 py-4"><div><p className="font-semibold text-navy">{lead.name || lead.company || "Dossier à préciser"}</p><p className="mt-1 text-xs text-ink/55">{lead.city ?? "Ville non renseignée"} · {crmSourceLabels[lead.sourceLead] ?? "Autre source"} · {lead.typeProjet}</p></div><span className="text-xs font-semibold text-navy">{leadStatusLabels[lead.status]}</span></a>) : <p className="py-5 text-sm leading-6 text-ink/55">Les premières demandes sauvegardées apparaîtront ici.</p>}</div></section>
     </>}
   </>;
-  const audit = <><div><h2 className="text-2xl font-black text-navy">Un suivi inspectable.</h2><p className="mt-2 text-sm leading-6 text-ink/60">Les changements de statut, les notes et les publications sont enregistres en base.</p></div>{!data ? <div className="mt-6">{unavailable}</div> : <div className="mt-6 overflow-hidden rounded-xl border border-navy/10 bg-white"><div className="divide-y divide-navy/10">{data.auditLogs.length ? data.auditLogs.map((item) => <div key={item.id} className="flex flex-wrap justify-between gap-3 px-5 py-4 text-sm"><div><p className="font-bold text-navy">{item.action}</p><p className="mt-1 text-xs text-ink/50">{item.entity} / {item.entityId ?? "Configuration"}</p></div><time className="text-ink/55">{item.createdAt.toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}</time></div>) : <p className="px-5 py-7 text-sm text-ink/55">Aucune action sensible enregistree.</p>}</div></div>}<LeadExports />{data && <section className="mt-7 rounded-xl border border-navy/10 bg-white p-5"><h3 className="text-xl font-bold text-navy">Notifications automatiques</h3><p className="mt-2 text-xs text-ink/50">Pre-devis et demandes / {periodLabel} / Europe/Paris</p><div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">{[{ key: "sent", label: "Acceptes par le fournisseur" }, { key: "partial", label: "Acceptation partielle" }, { key: "failed", label: "En echec" }, { key: "pending", label: "En cours" }, { key: "skipped", label: "Non envoyes" }].map((item) => <div key={item.key}><p className="text-xs text-ink/55">{item.label}</p><p className={`mt-2 text-2xl font-black ${item.key === "failed" && failedNotifications ? "text-red-800" : "text-navy"}`}>{data.notifications.find((status) => status.status === item.key)?._count._all ?? 0}</p></div>)}</div><p className="mt-4 text-xs leading-6 text-ink/50">Un envoi accepte ne garantit pas sa reception en boite. Les evenements non envoyes correspondent notamment a un canal non configure ou des notifications desactivees. Les details de livraison restent chez le fournisseur.</p></section>}<section className="mt-7 rounded-xl border border-navy/10 p-5"><h3 className="font-bold text-navy">Etat de l'application</h3><p className="mt-2 text-sm leading-6 text-ink/60">La disponibilite du conteneur se controle avec le healthcheck. Les sauvegardes, les logs et la migration sont pilotes dans Docker et Portainer.</p><Link href="/api/health" target="_blank" className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-bold text-navy">Ouvrir le healthcheck <ArrowUpRight size={15} /></Link></section></>;
-  return <AdminWorkspace overview={overview} pipeline={<LeadManager />} pricing={<PriceEditor />} gallery={<><RealisationEditor /><RealisationMediaManager /><ReviewManager /></>} settings={<><NotificationSettings /><SeoAdminPanel /></>} audit={audit} />;
+  const audit = <><div><h2 className="text-2xl font-black text-navy">Un suivi inspectable.</h2><p className="mt-2 text-sm leading-6 text-ink/60">Les changements de statut, les notes et les publications sont enregistres en base.</p></div>{!data ? <div className="mt-6">{unavailable}</div> : <div className="mt-6 overflow-hidden rounded-xl border border-navy/10 bg-white"><div className="divide-y divide-navy/10">{data.auditLogs.length ? data.auditLogs.map((item) => <div key={item.id} className="flex flex-wrap justify-between gap-3 px-5 py-4 text-sm"><div><p className="font-bold text-navy">{item.action}</p><p className="mt-1 text-xs text-ink/50">{item.entity} / {item.entityId ?? "Configuration"}</p>{item.actor && <p className="mt-1 break-all text-xs text-ink/60">Par {item.actor}</p>}</div><time className="text-ink/55">{item.createdAt.toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}</time></div>) : <p className="px-5 py-7 text-sm text-ink/55">Aucune action sensible enregistree.</p>}</div></div>}<LeadExports />{data && <section className="mt-7 rounded-xl border border-navy/10 bg-white p-5"><h3 className="text-xl font-bold text-navy">Notifications automatiques</h3><p className="mt-2 text-xs text-ink/50">Pre-devis et demandes / {periodLabel} / Europe/Paris</p><div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">{[{ key: "sent", label: "Acceptes par le fournisseur" }, { key: "partial", label: "Acceptation partielle" }, { key: "failed", label: "En echec" }, { key: "pending", label: "En cours" }, { key: "skipped", label: "Non envoyes" }].map((item) => <div key={item.key}><p className="text-xs text-ink/55">{item.label}</p><p className={`mt-2 text-2xl font-black ${item.key === "failed" && failedNotifications ? "text-red-800" : "text-navy"}`}>{data.notifications.find((status) => status.status === item.key)?._count._all ?? 0}</p></div>)}</div><p className="mt-4 text-xs leading-6 text-ink/50">Un envoi accepte ne garantit pas sa reception en boite. Les evenements non envoyes correspondent notamment a un canal non configure ou des notifications desactivees. Les details de livraison restent chez le fournisseur.</p></section>}<section className="mt-7 rounded-xl border border-navy/10 p-5"><h3 className="font-bold text-navy">Etat de l'application</h3><p className="mt-2 text-sm leading-6 text-ink/60">La disponibilite du conteneur se controle avec le healthcheck. Les sauvegardes, les logs et la migration sont pilotes dans Docker et Portainer.</p><Link href="/api/health" target="_blank" className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-bold text-navy">Ouvrir le healthcheck <ArrowUpRight size={15} /></Link></section></>;
+  return <AdminWorkspace identity={identity}
+    team={can("users:manage") ? <TeamAccounts identity={identity} /> : undefined}
+    mail={can("mail:read") ? <MailWorkspace identity={identity} /> : undefined}
+    overview={can("dashboard:read") ? overview : null}
+    pipeline={can("crm:read") ? <AdminPermissionPanel editable={can("crm:write")}><LeadManager /></AdminPermissionPanel> : null}
+    pricing={can("pricing:read") ? <PriceEditor readOnly={!can("pricing:write")} /> : null}
+    gallery={can("gallery:read") ? <><AdminPermissionPanel editable={can("gallery:write")}><RealisationEditor /><RealisationMediaManager /></AdminPermissionPanel>{can("reviews:read") && <AdminPermissionPanel editable={can("reviews:write")}><ReviewManager /></AdminPermissionPanel>}</> : null}
+    settings={can("settings:read") ? <AdminPermissionPanel editable={can("settings:write")}><NotificationSettings /><SeoAdminPanel /></AdminPermissionPanel> : null}
+    audit={can("audit:read") ? audit : null} />;
 }
