@@ -1,2 +1,9 @@
 # Shell scripts must remain executable by Linux even after a Windows checkout.
 *.sh text eol=lf
+
+# Keep PDF byte offsets and media intact across Windows and Linux checkouts.
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
