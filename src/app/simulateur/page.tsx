@@ -1,28 +1,14 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import { Estimator } from "@/components/calculators/Estimator";
-import { SectionHeading } from "@/components/marketing/SectionHeading";
+import styles from "@/components/calculators/Estimator.module.css";
 
-export const metadata: Metadata = {
-  title: "Simulateur travaux",
-  description: "Estimez votre projet de rénovation énergétique, fenêtres, isolation ou rénovation globale avec A2E Rénovation."
-};
+export const metadata: Metadata = { title: "Estimer mes travaux", description: "Composez vos travaux en quatre étapes : métiers, quantités, budget expliqué et pré-devis PDF. Votre projet multi-postes avec A2E en Île-de-France." };
 
 export default function SimulatorPage() {
-  return (
-    <main>
-      <section className="photo-hero py-20 text-white">
-        <div className="container">
-          <p className="font-black uppercase tracking-[.16em] text-champagne">Pré-devis indicatif</p>
-          <h1 className="mt-4 max-w-4xl text-4xl font-black leading-tight md:text-6xl">Simulateur travaux A2E Rénovation</h1>
-          <p className="mt-5 max-w-2xl text-white/75">Répondez aux questions essentielles et recevez une première estimation PDF.</p>
-        </div>
-      </section>
-      <section className="section premium-surface">
-        <div className="container">
-          <SectionHeading eyebrow="Tunnel mobile-first" title="Votre projet, vos contraintes, votre fourchette" />
-          <Estimator />
-        </div>
-      </section>
-    </main>
-  );
+  return <main id="main-content" className={styles.page}>
+    <header className={styles.pageHeader}><div className="container"><div className={styles.pageIntro}><div><p className={styles.eyebrow}>A2E / Votre estimation</p><h1>Un budget pour vos travaux.</h1><p>Composez votre projet. Ajustez vos choix. Préparez la suite.</p></div><Link href="/tarifs">Nos repères de prix <ArrowUpRight size={16} /></Link></div></div></header>
+    <section className={styles.pageBody}><div className="container"><Estimator /><p className={styles.disclaimer}>Cette estimation prépare votre échange avec A2E. Le métré, l’état des supports, l’accès et les raccordements seront confirmés avant le devis contractuel. Les aides ne sont pas déduites automatiquement.</p></div></section>
+  </main>;
 }

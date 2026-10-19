@@ -1,10 +1,17 @@
 import { prisma } from "@/lib/db/prisma";
 import { unstable_noStore as noStore } from "next/cache";
-import { realisations as demoRealisations } from "@/lib/site-data";
+import { gallerySettingsKey } from "./gallery";
+import { demoProjects } from "./demo-projects";
 
 export async function getPublicRealisations() {
   noStore();
-  const databaseItems = await prisma.realisation.findMany({ where: { active: true }, orderBy: { createdAt: "desc" } }).catch(() => []);
-  const fallback = demoRealisations.map((item, index) => ({ id: `demo-realisation-${index}`, ...item, description: `${item.title} - projet de demonstration A2E.`, active: true }));
-  return fallback.map((item) => databaseItems.find((databaseItem) => databaseItem.id === item.id) ?? item).concat(databaseItems.filter((item) => !item.id.startsWith("demo-realisation-")));
+  // A disconnected local preview is useful; a configured database always remains authoritative.
+  if (!process.env.DATABASE_URL) return demoProjects;
+  const items = await prisma.realisation.findMany({
+    where: { active: true }, orderBy: { createdAt: "desc" },
+    include: { media: { orderBy: { createdAt: "desc" } }, photos: { orderBy: { sortOrder: "asc" } } }
+  }).catch(() => []);
+  if (!items.length) return [];
+  const settings = await prisma.siteSettings.findMany({ where: { key: { in: items.map(item => gallerySettingsKey(item.id)) } } }).catch(() => []);
+  return items.map(item => ({ ...item, galleryManifest: settings.find(setting => setting.key === gallerySettingsKey(item.id))?.value }));
 }

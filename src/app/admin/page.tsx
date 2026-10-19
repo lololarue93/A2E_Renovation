@@ -1,62 +1,62 @@
 import Link from "next/link";
+import { ArrowUpRight, CircleAlert } from "lucide-react";
 import { prisma } from "@/lib/db/prisma";
-import { priceItems } from "@/lib/pricing/price-data";
-import { realisations, team, trustBadges } from "@/lib/site-data";
+import { AdminWorkspace } from "@/components/admin/AdminWorkspace";
+import { LeadManager } from "@/components/admin/LeadManager";
 import { PriceEditor } from "@/components/admin/PriceEditor";
 import { NotificationSettings } from "@/components/admin/NotificationSettings";
 import { RealisationMediaManager } from "@/components/admin/RealisationMediaManager";
 import { LeadExports } from "@/components/admin/LeadExports";
 import { SeoAdminPanel } from "@/components/admin/SeoAdminPanel";
-import { AnalyticsTrend } from "@/components/admin/AnalyticsTrend";
+import { AcquisitionDashboard } from "@/components/admin/AcquisitionDashboard";
 import { RealisationEditor } from "@/components/admin/RealisationEditor";
+import { ReviewManager } from "@/components/admin/ReviewManager";
+import { leadStatusLabels } from "@/lib/admin/lead-status";
+import { dashboardPeriod, summarizeDashboardEvents } from "@/lib/admin/dashboard-metrics";
+import { crmDueWhere, crmSourceLabels } from "@/lib/admin/crm";
 
 export const dynamic = "force-dynamic";
-
-export default async function AdminPage() {
-  const [leads, eventCounts, recentViews, consentedLeads, projectCounts, statusCounts, auditLogs, trendEvents] = process.env.DATABASE_URL
-    ? await Promise.all([
-        prisma.lead.findMany({ orderBy: { createdAt: "desc" }, take: 8, include: { estimates: { orderBy: { createdAt: "desc" }, take: 1 } } }).catch(() => []),
-        prisma.siteEvent.groupBy({ by: ["event"], _count: { _all: true }, where: { createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } } }).catch(() => []),
-        prisma.siteEvent.count({ where: { event: "page_view", createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } } }).catch(() => 0),
-        prisma.lead.count({ where: { consent: true } }).catch(() => 0),
-        prisma.lead.groupBy({ by: ["typeProjet"], where: { consent: true }, _count: { _all: true }, orderBy: { _count: { typeProjet: "desc" } } }).catch(() => []),
-        prisma.lead.groupBy({ by: ["status"], where: { consent: true }, _count: { _all: true } }).catch(() => []),
-        prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 6 }).catch(() => []),
-        prisma.siteEvent.findMany({ where: { createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } }, select: { event: true, createdAt: true } }).catch(() => [])
-      ])
-    : [[], [], 0, 0, [], [], [], []];
-  const countFor = (event: string) => eventCounts.find((item) => item.event === event)?._count._all ?? 0;
-  const conversionRate = recentViews ? Math.round((countFor("lead_submitted") / recentViews) * 1000) / 10 : 0;
-  const trendPoints = Array.from({ length: 30 }, (_, index) => {
-    const date = new Date();
-    date.setHours(0, 0, 0, 0);
-    date.setDate(date.getDate() - (29 - index));
-    const next = new Date(date);
-    next.setDate(next.getDate() + 1);
-    const dayEvents = trendEvents.filter((event) => event.createdAt >= date && event.createdAt < next);
-    return { label: date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }), views: dayEvents.filter((event) => event.event === "page_view").length, quotes: dayEvents.filter((event) => event.event === "quote_started").length, leads: dayEvents.filter((event) => event.event === "lead_submitted").length };
-  });
-
-  return (
-    <main className="min-h-screen bg-mist py-10">
-      <div className="container">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-          <div><p className="font-black uppercase tracking-[.18em] text-champagne">Admin auditeur</p><h1 className="text-4xl font-black text-navy">Pilotage A2E</h1><p className="mt-2 text-sm text-ink/60">Leads, visibilité, notifications, contenus et maintenance.</p></div>
-          <div className="flex flex-wrap gap-2"><a href="#notifications" className="min-h-11 rounded-card border border-navy/15 px-4 py-3 font-black text-navy">Notifications</a><a href="#pipeline" className="min-h-11 rounded-card border border-navy/15 px-4 py-3 font-black text-navy">Pipeline</a><Link href="/" className="min-h-11 rounded-card bg-navy px-4 py-3 font-black text-white">Voir le site</Link></div>
-        </div>
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Metric label="Visites 30 jours" value={recentViews.toLocaleString("fr-FR")} /><Metric label="Demarrages simulateur" value={countFor("quote_started").toLocaleString("fr-FR")} /><Metric label="Leads qualifies" value={countFor("lead_submitted").toLocaleString("fr-FR")} /><Metric label="Conversion visite vers lead" value={`${conversionRate.toLocaleString("fr-FR")} %`} /></section>
-        <section className="mt-8 a2e-card p-6"><p className="font-black uppercase tracking-[.16em] text-champagne">Acquisition</p><h2 className="mt-2 text-2xl font-black text-navy">Evolution des visites et conversions</h2><p className="mt-2 text-sm text-ink/60">Suivi quotidien sur les 30 derniers jours, à partir des événements réellement enregistrés.</p><AnalyticsTrend points={trendPoints} /></section>
-        <section id="pipeline" className="mt-8 grid gap-5 lg:grid-cols-[1.2fr_.8fr]"><div className="a2e-card p-6"><div className="flex items-center justify-between gap-3"><div><p className="font-black uppercase tracking-[.16em] text-champagne">Pipeline qualifie</p><h2 className="mt-2 text-2xl font-black text-navy">Leads ayant accepte le contact</h2></div><strong className="text-3xl font-black text-navy">{consentedLeads}</strong></div><div className="mt-5 grid gap-2 sm:grid-cols-2">{statusCounts.length === 0 ? <p className="text-sm text-ink/60">Les statuts apparaitront apres les premiers leads.</p> : statusCounts.map((item) => <div key={item.status} className="flex justify-between rounded-card bg-pearl px-4 py-3 text-sm"><span className="font-bold text-ink/70">{item.status}</span><strong className="text-navy">{item._count._all}</strong></div>)}</div></div><div className="a2e-card p-6"><p className="font-black uppercase tracking-[.16em] text-champagne">Demande</p><h2 className="mt-2 text-2xl font-black text-navy">Projets les plus demandes</h2><div className="mt-5 space-y-2">{projectCounts.length === 0 ? <p className="text-sm text-ink/60">Pas encore de donnees.</p> : projectCounts.map((item) => <div key={item.typeProjet} className="flex justify-between rounded-card border border-ink/10 px-4 py-3 text-sm"><span className="font-bold text-ink/70">{item.typeProjet}</span><strong className="text-navy">{item._count._all}</strong></div>)}</div></div></section>
-        <div className="mt-8 grid gap-5 lg:grid-cols-3"><AdminCard title="Leads" value={`${leads.length} derniers leads`} items={["Nouveau", "A rappeler", "Visite a planifier", "Devis envoye"]} /><AdminCard title="Visibilite" value="SEO et acquisition" items={["Sitemap XML", "Donnees structurees", "Pages Ile-de-France", "Suivi Search Console"]} /><AdminCard title="Maintenance" value="Audit de production" items={["Healthcheck Docker", "Journal admin", "Dependances GitHub", "Alertes securite"]} /></div>
-        <section className="mt-8 a2e-card p-6"><h2 className="text-2xl font-black text-navy">Derniers leads</h2><div className="mt-4 grid gap-3">{leads.length === 0 ? <p className="rounded-card bg-pearl p-4 text-sm font-bold text-ink/65">Aucun lead pour le moment.</p> : leads.map((lead) => <div key={lead.id} className="grid gap-3 rounded-card bg-pearl p-4 md:grid-cols-[1fr_auto]"><div><p className="font-black text-navy">{lead.name}</p><p className="text-sm text-ink/65">{lead.phone} · {lead.email} · {lead.city ?? "Zone non renseignee"}</p><p className="mt-1 text-sm font-bold text-champagne">{lead.typeProjet} · {lead.status} · {lead.consent ? "Contact accepte" : "Sans consentement"}</p></div><div className="text-left md:text-right"><p className="font-black text-navy">{(lead.estimates[0]?.mid ?? lead.budget ?? 0).toLocaleString("fr-FR")} EUR</p><p className="text-xs text-ink/55">{lead.createdAt.toLocaleDateString("fr-FR")}</p></div></div>)}</div></section>
-        <section className="mt-8 a2e-card p-6"><h2 className="text-2xl font-black text-navy">Prix de demonstration</h2><div className="mt-4 grid gap-2">{priceItems.slice(0, 12).map((item) => <div className="grid gap-2 rounded-card bg-pearl p-3 text-sm md:grid-cols-[1fr_auto]" key={item.key}><span className="font-bold">{item.label}</span><span>{item.low} / {item.mid} / {item.high} EUR {item.unit}</span></div>)}</div></section>
-        <PriceEditor /><NotificationSettings /><LeadExports /><SeoAdminPanel /><RealisationEditor /><RealisationMediaManager />
-        <section className="mt-8 a2e-card p-6"><div className="flex items-center justify-between gap-3"><div><p className="font-black uppercase tracking-[.16em] text-champagne">Audit et maintenance</p><h2 className="mt-2 text-2xl font-black text-navy">Journal des actions sensibles</h2></div><span className="rounded-card bg-pearl px-3 py-2 text-xs font-black text-ink/65">{auditLogs.length} evenements</span></div><div className="mt-4 space-y-2">{auditLogs.length === 0 ? <p className="text-sm text-ink/60">Aucune action admin enregistree.</p> : auditLogs.map((item) => <div key={item.id} className="flex flex-wrap justify-between gap-2 rounded-card bg-pearl px-4 py-3 text-sm"><span className="font-bold text-navy">{item.action} · {item.entity}</span><time className="text-ink/55">{item.createdAt.toLocaleString("fr-FR")}</time></div>)}</div><p className="mt-5 text-xs leading-5 text-ink/55">Les mises a jour Docker, dependances et alertes de securite sont validees depuis GitHub Actions et Portainer. Les secrets ne sont jamais stockes dans Git.</p></section>
-        <div className="mt-8 grid gap-5 md:grid-cols-3"><AdminCard title="Realisations" value={`${realisations.length} demos`} items={realisations.map((item) => item.title)} /><AdminCard title="Equipe" value={`${team.length} profils`} items={team.map((item) => item.name)} /><AdminCard title="Badges confiance" value={`${trustBadges.length} badges`} items={trustBadges.map((item) => item.label)} /></div>
-      </div>
-    </main>
-  );
+async function loadDashboard(start: Date, end: Date, now: Date) {
+  const period = { gte: start, lt: end };
+  const [events, leads30, statusCounts, recentLeads, auditLogs, notifications, tracking, webLeads30, allLeads, overdue, today] = await Promise.all([
+    prisma.siteEvent.findMany({ where: { createdAt: period, NOT: { path: { startsWith: "/admin" } } }, select: { event: true, label: true, path: true, sessionId: true, createdAt: true } }),
+    prisma.lead.count({ where: { createdAt: period } }),
+    prisma.lead.groupBy({ by: ["status"], _count: { _all: true } }),
+    prisma.lead.findMany({ orderBy: { createdAt: "desc" }, take: 5, select: { id: true, name: true, company: true, city: true, sourceLead: true, typeProjet: true, status: true, createdAt: true } }),
+    prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 15, select: { id: true, action: true, entity: true, entityId: true, createdAt: true } }),
+    prisma.webhookEvent.groupBy({ by: ["status"], where: { name: { in: ["notification.leadCreated", "notification.pdfGenerated", "notification.contactCreated"] }, createdAt: period }, _count: { _all: true } }),
+    prisma.siteSettings.findUnique({ where: { key: "notifications" }, select: { value: true } }),
+    prisma.lead.count({ where: { sourceLead: { startsWith: "website" }, consent: true, createdAt: period } }),
+    prisma.lead.count(),
+    prisma.lead.count({ where: crmDueWhere("overdue", now) }),
+    prisma.lead.count({ where: crmDueWhere("today", now) })
+  ]);
+  const trackingEnabled = !(tracking?.value && typeof tracking.value === "object" && !Array.isArray(tracking.value) && tracking.value.trackingEnabled === false);
+  return { events, leads30, statusCounts, recentLeads, auditLogs, notifications, trackingEnabled, webLeads30, allLeads, overdue, today };
 }
 
-function AdminCard({ title, value, items }: { title: string; value: string; items: string[] }) { return <div className="a2e-card p-5"><h2 className="text-xl font-black text-navy">{title}</h2><p className="mt-2 font-bold text-champagne">{value}</p><ul className="mt-4 space-y-2 text-sm text-ink/68">{items.slice(0, 6).map((item) => <li key={item}>- {item}</li>)}</ul></div>; }
-function Metric({ label, value }: { label: string; value: string }) { return <div className="a2e-card p-5"><p className="text-sm font-bold text-ink/60">{label}</p><p className="mt-2 text-3xl font-black text-navy">{value}</p><p className="mt-1 text-xs text-champagne">30 derniers jours</p></div>; }
+export default async function AdminPage() {
+  const now = new Date();
+  const { keys, start, end } = dashboardPeriod(now);
+  const data = process.env.DATABASE_URL ? await loadDashboard(start, end, now).catch(() => null) : null;
+
+  const eventSummary = summarizeDashboardEvents(data?.events ?? [], keys);
+  const failedNotifications = data?.notifications.find((item) => item.status === "failed")?._count._all ?? 0;
+  const partialNotifications = data?.notifications.find((item) => item.status === "partial")?._count._all ?? 0;
+  const pendingNotifications = data?.notifications.find((item) => item.status === "pending")?._count._all ?? 0;
+  const pending = data?.statusCounts.filter((item) => item.status === "nouveau" || item.status === "a_rappeler").reduce((sum, item) => sum + item._count._all, 0) ?? 0;
+  const toPrepare = data?.statusCounts.filter((item) => item.status === "visite_a_planifier" || item.status === "devis_a_preparer").reduce((sum, item) => sum + item._count._all, 0) ?? 0;
+  const periodLabel = `${keys[0].split("-").reverse().join("/")} au ${keys[29].split("-").reverse().join("/")}`;
+  const unavailable = <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-5"><div className="flex items-start gap-3"><CircleAlert size={20} className="mt-0.5 shrink-0 text-amber-800" /><div><h2 className="font-bold text-amber-900">Les données de pilotage sont indisponibles.</h2><p className="mt-2 text-sm leading-6 text-amber-900/75">Vérifiez la connexion PostgreSQL. Aucun compteur n’est affiché comme zéro pendant une panne.</p></div></div></div>;
+  const overview = <>
+    <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-ink/60">{periodLabel} · 30 jours calendaires, aujourd’hui partiel</p><span className="text-xs font-semibold text-ink/55">Europe/Paris · PostgreSQL</span></div>
+    {!data ? <div className="mt-6">{unavailable}</div> : <>
+      <section className="mt-6 border-y border-navy/15 py-6" aria-labelledby="commercial-title"><div className="flex flex-wrap items-center justify-between gap-3"><h2 id="commercial-title" className="text-xl font-bold text-navy">Les demandes réelles, puis les prochaines actions.</h2><a href="#pipeline" className="button-text">Ouvrir les dossiers <ArrowUpRight size={16} /></a></div><div className="mt-6 grid gap-6 sm:grid-cols-3"><div><p className="text-sm text-ink/60">Demandes web enregistrées</p><p className="mt-2 text-3xl font-bold tabular-nums text-navy">{data.webLeads30.toLocaleString("fr-FR")}</p><p className="mt-2 text-xs text-ink/50">Sur 30 jours · simulateur et contact</p></div><div><p className="text-sm text-ink/60">À contacter</p><p className="mt-2 text-3xl font-bold tabular-nums text-navy">{pending.toLocaleString("fr-FR")}</p><p className="mt-2 text-xs text-ink/50">Nouveaux / à rappeler · toutes périodes</p></div><div><p className="text-sm text-ink/60">Visites et devis à préparer</p><p className="mt-2 text-3xl font-bold tabular-nums text-navy">{toPrepare.toLocaleString("fr-FR")}</p><p className="mt-2 text-xs text-ink/50">Visite à planifier / devis à préparer · toutes périodes</p></div></div><p className="mt-5 text-xs leading-6 text-ink/50">Source CRM : {data.allLeads} dossiers au total, dont {data.leads30} créés sur 30 jours, toutes sources et accords de contact confondus. Les demandes web exigent l’accord pour être recontacté. Ces dossiers doivent encore être qualifiés par l’équipe ; aucun compteur ne prouve une signature ou un chiffre d’affaires.</p></section>
+      <section className="mt-6" aria-labelledby="actions-title"><div className="flex flex-wrap items-center justify-between gap-3"><h2 id="actions-title" className="text-lg font-bold text-navy">À traiter maintenant</h2><a href="/admin?create=prospect#pipeline" className="button-text">Ajouter un prospect ↗</a></div><div className="mt-4 flex flex-wrap gap-4 text-sm"><a href="/admin?due=overdue#pipeline" className={`inline-flex min-h-11 items-center gap-2 font-semibold underline ${data.overdue ? "text-red-800" : "text-navy"}`}>{data.overdue} action(s) en retard ↗</a><a href="/admin?due=today#pipeline" className="inline-flex min-h-11 items-center gap-2 font-semibold text-navy underline">{data.today} action(s) aujourd’hui ↗</a></div><p className="text-xs leading-6 text-ink/50">Échéances à Paris, dossiers actifs de toutes sources. Les dossiers signés, gagnés ou perdus sont exclus. Aucun message client n’est envoyé automatiquement.</p><ul className="mt-3 divide-y divide-navy/10 border-y border-navy/10"><li className="flex flex-wrap items-center justify-between gap-3 py-4"><p className="text-sm leading-6 text-ink/65">{pending ? `${pending} dossier(s) attendent une première prise de contact ou un rappel.` : "Aucun dossier nouveau ou à rappeler."}</p><a href="#pipeline" className="button-text">Préparer la prochaine action ↗</a></li><li className="flex flex-wrap items-center justify-between gap-3 py-4"><p className="text-sm leading-6 text-ink/65">{(failedNotifications + partialNotifications) ? `${failedNotifications + partialNotifications} notification(s) en échec ou partiellement acceptée(s) sur 30 jours : inspectez le canal et le journal.` : "Aucun échec de notification enregistré sur 30 jours."}{pendingNotifications > 0 && ` ${pendingNotifications} tentative(s) restent en attente ; contrôlez leur journal, sans présumer d’une relance automatique.`}</p><a href="#audit" className="button-text">Vérifier les envois ↗</a></li></ul></section>
+      <AcquisitionDashboard metrics={eventSummary} trackingEnabled={data.trackingEnabled} />
+      <section className="mt-7 border-y border-navy/10 py-5"><div className="flex items-center justify-between gap-3"><h2 className="text-xl font-bold text-navy">Derniers dossiers enregistrés</h2><a href="#pipeline" className="button-text">Tout voir <ArrowUpRight size={15} /></a></div><div className="mt-3 divide-y divide-navy/10">{data.recentLeads.length ? data.recentLeads.map((lead) => <a key={lead.id} href={`/admin?lead=${lead.id}#pipeline`} className="flex min-h-14 flex-wrap items-center justify-between gap-3 py-4"><div><p className="font-semibold text-navy">{lead.name || lead.company || "Dossier à préciser"}</p><p className="mt-1 text-xs text-ink/55">{lead.city ?? "Ville non renseignée"} · {crmSourceLabels[lead.sourceLead] ?? "Autre source"} · {lead.typeProjet}</p></div><span className="text-xs font-semibold text-navy">{leadStatusLabels[lead.status]}</span></a>) : <p className="py-5 text-sm leading-6 text-ink/55">Les premières demandes sauvegardées apparaîtront ici.</p>}</div></section>
+    </>}
+  </>;
+  const audit = <><div><h2 className="text-2xl font-black text-navy">Un suivi inspectable.</h2><p className="mt-2 text-sm leading-6 text-ink/60">Les changements de statut, les notes et les publications sont enregistres en base.</p></div>{!data ? <div className="mt-6">{unavailable}</div> : <div className="mt-6 overflow-hidden rounded-xl border border-navy/10 bg-white"><div className="divide-y divide-navy/10">{data.auditLogs.length ? data.auditLogs.map((item) => <div key={item.id} className="flex flex-wrap justify-between gap-3 px-5 py-4 text-sm"><div><p className="font-bold text-navy">{item.action}</p><p className="mt-1 text-xs text-ink/50">{item.entity} / {item.entityId ?? "Configuration"}</p></div><time className="text-ink/55">{item.createdAt.toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}</time></div>) : <p className="px-5 py-7 text-sm text-ink/55">Aucune action sensible enregistree.</p>}</div></div>}<LeadExports />{data && <section className="mt-7 rounded-xl border border-navy/10 bg-white p-5"><h3 className="text-xl font-bold text-navy">Notifications automatiques</h3><p className="mt-2 text-xs text-ink/50">Pre-devis et demandes / {periodLabel} / Europe/Paris</p><div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">{[{ key: "sent", label: "Acceptes par le fournisseur" }, { key: "partial", label: "Acceptation partielle" }, { key: "failed", label: "En echec" }, { key: "pending", label: "En cours" }, { key: "skipped", label: "Non envoyes" }].map((item) => <div key={item.key}><p className="text-xs text-ink/55">{item.label}</p><p className={`mt-2 text-2xl font-black ${item.key === "failed" && failedNotifications ? "text-red-800" : "text-navy"}`}>{data.notifications.find((status) => status.status === item.key)?._count._all ?? 0}</p></div>)}</div><p className="mt-4 text-xs leading-6 text-ink/50">Un envoi accepte ne garantit pas sa reception en boite. Les evenements non envoyes correspondent notamment a un canal non configure ou des notifications desactivees. Les details de livraison restent chez le fournisseur.</p></section>}<section className="mt-7 rounded-xl border border-navy/10 p-5"><h3 className="font-bold text-navy">Etat de l'application</h3><p className="mt-2 text-sm leading-6 text-ink/60">La disponibilite du conteneur se controle avec le healthcheck. Les sauvegardes, les logs et la migration sont pilotes dans Docker et Portainer.</p><Link href="/api/health" target="_blank" className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-bold text-navy">Ouvrir le healthcheck <ArrowUpRight size={15} /></Link></section></>;
+  return <AdminWorkspace overview={overview} pipeline={<LeadManager />} pricing={<PriceEditor />} gallery={<><RealisationEditor /><RealisationMediaManager /><ReviewManager /></>} settings={<><NotificationSettings /><SeoAdminPanel /></>} audit={audit} />;
+}

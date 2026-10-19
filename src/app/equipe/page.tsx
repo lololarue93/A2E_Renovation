@@ -1,28 +1,10 @@
 import type { Metadata } from "next";
-import { SectionHeading } from "@/components/marketing/SectionHeading";
+import Link from "next/link";
+import { ArrowUpRight, MessagesSquare, Route, ClipboardList } from "lucide-react";
 import { TeamGrid } from "@/components/team/TeamGrid";
+import { TrustBadges } from "@/components/trust/TrustBadges";
 
-export const metadata: Metadata = {
-  title: "Notre équipe",
-  description: "Découvrez l'équipe A2E Rénovation : conseil, conduite de travaux et relation client."
-};
-
+export const metadata: Metadata = { title: "Vos interlocuteurs", description: "Présentez votre projet à A2E Rénovation et préparez les étapes de votre chantier en Île-de-France." };
 export default function TeamPage() {
-  return (
-    <main>
-      <section className="photo-hero py-20 text-white">
-        <div className="container">
-          <p className="font-black uppercase tracking-[.16em] text-champagne">Équipe A2E</p>
-          <h1 className="mt-4 text-4xl font-black md:text-6xl">Des interlocuteurs identifiés</h1>
-          <p className="mt-5 max-w-2xl text-white/76">Un projet rassurant commence par des personnes claires : conseil, suivi, chiffrage et conduite de chantier.</p>
-        </div>
-      </section>
-      <section className="section photo-wash">
-        <div className="container">
-          <SectionHeading eyebrow="Humain" title="Une équipe pensée pour rassurer chaque client" />
-          <TeamGrid />
-        </div>
-      </section>
-    </main>
-  );
+  return <main id="main-content"><section className="page-heading"><div className="container"><p className="eyebrow">Les échanges / Le suivi</p><h1>Un projet de travaux.<br />Une conversation d'abord.</h1><p>Vos priorités, vos contraintes et vos questions donnent le point de départ. Nous préparons les échanges utiles pour cadrer chaque lot.</p><Link className="button-text" href="/contact">Présenter mon projet <ArrowUpRight size={17} /></Link></div></section><section className="section"><div className="container grid gap-10 lg:grid-cols-[.75fr_1.25fr]"><div><p className="eyebrow">Votre point d'entrée</p><h2 className="text-3xl font-semibold text-navy">Identifier le bon<br />interlocuteur.</h2><p className="mt-5 max-w-sm text-sm leading-7 text-ink/65">Les intervenants, leurs missions et le périmètre de leurs travaux sont à préciser lors de la préparation du chantier.</p></div><TeamGrid /></div></section><section className="section estimate-section"><div className="container"><div className="section-intro"><div><p className="eyebrow">Les étapes d'un échange</p><h2>Avancer avec<br />les bonnes informations.</h2></div><p>Un chantier se prépare avec un besoin clair, un périmètre détaillé et des décisions tracées.</p></div><div className="method-grid">{[{ icon: MessagesSquare, title: "Parler du besoin", text: "Présentez le logement, les pièces concernées et ce que vous souhaitez améliorer." }, { icon: ClipboardList, title: "Préparer le chiffrage", text: "Listez les postes, rassemblez vos dimensions et repérez les contraintes à vérifier." }, { icon: Route, title: "Clarifier la suite", text: "Convenez des prochaines étapes : visite, choix techniques, devis et calendrier." }].map(({ icon: Icon, title, text }) => <div key={title}><Icon size={25} strokeWidth={1.5} className="text-champagne" /><h3>{title}</h3><p>{text}</p></div>)}</div></div></section><section className="section"><div className="container"><TrustBadges /></div></section></main>;
 }

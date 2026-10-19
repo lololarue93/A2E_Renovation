@@ -1,44 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ArrowUpRight, Mail, MapPin, Phone } from "lucide-react";
 import { siteSettings } from "@/lib/site-data";
-import { PhoneQrCard } from "@/components/marketing/PhoneQrCard";
 import { SocialLinks } from "@/components/marketing/SocialLinks";
 import { getSiteContactSettings } from "@/lib/settings/site-contact-settings";
+import { ContactForm } from "@/components/forms/ContactForm";
 
-export const metadata: Metadata = {
-  title: "Contact",
-  description: "Contactez A2E Rénovation pour un projet de fenêtres, isolation, rénovation énergétique ou rénovation globale."
-};
-
+export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Parler de mon projet", description: "Présentez vos travaux à A2E Rénovation : téléphone, email ou formulaire de contact pour un projet en Île-de-France." };
 export default async function ContactPage() {
   const contact = await getSiteContactSettings();
-  return (
-    <main>
-      <section className="photo-hero py-20 text-white">
-        <div className="container">
-          <p className="font-black uppercase tracking-[.16em] text-champagne">Contact</p>
-          <h1 className="mt-4 text-4xl font-black md:text-6xl">Parler de votre projet</h1>
-          <p className="mt-5 text-white/76">{siteSettings.phone} · {siteSettings.email}</p>
-        </div>
-      </section>
-      <section className="section premium-surface">
-        <div className="container grid gap-6 lg:grid-cols-[.85fr_1.15fr]">
-          <div className="a2e-card bg-white/95 p-7">
-            <h2 className="text-2xl font-black text-navy">Coordonnées</h2>
-            <p className="mt-4"><strong>Président :</strong> {siteSettings.president}</p>
-            <p><strong>Téléphone :</strong> {contact.phone}</p>
-            <p><strong>Email :</strong> {siteSettings.email}</p>
-            <p><strong>Réseaux :</strong> {siteSettings.social}</p>
-            <div className="mt-5"><SocialLinks /></div>
-          </div>
-          <div className="a2e-card p-7">
-            <h2 className="text-2xl font-black text-navy">Démarrer avec une première fourchette</h2>
-            <p className="mt-3 text-ink/66">Le simulateur crée un dossier projet plus qualifié qu'un simple message de contact : poste concerné, dimensions, niveau de finition et budget indicatif.</p>
-            <Link href="/simulateur" className="mt-6 inline-flex rounded-card bg-navy px-5 py-3 font-black text-white">Estimer mon projet</Link>
-          </div>
-        </div>
-        <div className="container mt-6"><PhoneQrCard /></div>
-      </section>
-    </main>
-  );
+  return <main id="main-content"><section className="page-heading"><div className="container"><p className="eyebrow">Le premier échange</p><h1>Une idée de travaux ?<br />Parlons-en.</h1><p>Un logement à transformer, une pièce à repenser ou plusieurs postes à coordonner. Présentez-nous ce que vous avez en tête.</p></div></section><section className="section"><div className="container grid gap-12 lg:grid-cols-[.8fr_1.2fr]"><aside><p className="eyebrow">Contact direct</p><div className="border-t border-navy/15"><a href={`tel:${contact.phone.replace(/[^+\d]/g, "")}`} data-track="phone_click" data-track-label="Contact - Appel direct" className="flex min-h-20 items-center justify-between gap-5 border-b border-navy/15 py-5"><span className="flex items-center gap-3"><Phone size={20} strokeWidth={1.5} /><span className="text-xl font-semibold">{contact.phone}</span></span><ArrowUpRight size={19} /></a><a href={`mailto:${siteSettings.email}`} data-track="cta_click" data-track-label="Contact - Email" className="flex min-h-20 items-center justify-between gap-5 border-b border-navy/15 py-5"><span className="flex min-w-0 items-center gap-3"><Mail size={20} strokeWidth={1.5} className="shrink-0" /><span className="truncate font-semibold">{siteSettings.email}</span></span><ArrowUpRight size={19} className="shrink-0" /></a><p className="flex items-center gap-3 border-b border-navy/15 py-6 text-sm"><MapPin size={20} strokeWidth={1.5} /> Projets en Île-de-France</p></div><div className="mt-6"><SocialLinks /></div><div className="mt-10 border-l-2 border-champagne/60 pl-5"><h2 className="text-xl font-semibold text-navy">Vous avez déjà des dimensions ?</h2><p className="mt-3 text-sm leading-7 text-ink/65">Le simulateur permet de composer plusieurs postes et de préparer une première estimation indicative.</p><Link href="/simulateur" className="button-text mt-4" data-track="cta_click" data-track-label="Contact - Simulateur">Composer mon projet <ArrowUpRight size={17} /></Link></div></aside><ContactForm /></div></section></main>;
 }

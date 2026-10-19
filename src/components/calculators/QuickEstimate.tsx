@@ -2,16 +2,71 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Calculator } from "lucide-react";
-import { estimateProject, type EstimateInput } from "@/lib/pricing/estimate-engine";
-import type { ProjectType } from "@/lib/pricing/price-data";
+import { ArrowUpRight, Check, Droplets, House, Layers, Minus, PanelsTopLeft, Plus, ThermometerSun, Zap } from "lucide-react";
+import { estimateProject } from "@/lib/pricing/estimate-engine";
+import { usePricing } from "./usePricing";
+import { buildExpressProjectInput, type ExpressProjectType } from "./estimator-flow";
+import styles from "./QuickEstimate.module.css";
+
+const choices = [
+  { type: "windows", label: "Fenêtres", icon: PanelsTopLeft },
+  { type: "insulation", label: "Isolation", icon: Layers },
+  { type: "electricity", label: "Électricité", icon: Zap },
+  { type: "plumbing", label: "Plomberie", icon: Droplets },
+  { type: "hvac", label: "Chauffage", icon: ThermometerSun },
+  { type: "global", label: "Rénovation", icon: House }
+] as const;
+const money = (value: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(value);
 
 export function QuickEstimate() {
-  const [projectType, setProjectType] = useState<ProjectType>("windows");
-  const [surface, setSurface] = useState(80);
-  const [quantity, setQuantity] = useState(4);
-  const input = useMemo<EstimateInput>(() => ({ projectType, projectTypes: [projectType], city: "Ile-de-France", surface, material: "pvc", finish: "standard", urgency: "normal", access: "simple", windowItems: [{ kind: "window", quantity, material: "pvc", width: 125, height: 135, opening: "french", installPack: "renovation", shutter: false }], electricalItems: [{ kind: "socket", quantity: Math.max(1, quantity) }], plumbingFixtures: [{ kind: "shower", quantity: Math.max(1, quantity) }], includePanel: true, energy: { energyType: "electricity", currentDpe: "unknown", insulation: "unknown", household: 2, solar: false } }), [projectType, quantity, surface]);
-  const result = useMemo(() => estimateProject(input), [input]);
-  const isWindow = projectType === "windows";
-  return <div className="a2e-card overflow-hidden border-navy/10 bg-white shadow-premium"><div className="grid gap-6 p-5 md:grid-cols-[1.1fr_.9fr] md:p-7"><div><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-card bg-pearl text-champagne"><Calculator size={20} /></span><div><p className="text-xs font-black uppercase tracking-[.16em] text-champagne">Calculette express</p><h3 className="text-xl font-black text-navy">Un premier ordre de grandeur en 30 secondes</h3></div></div><div className="mt-6 grid gap-4 sm:grid-cols-2"><label className="grid gap-2 text-sm font-bold text-ink/80">Poste principal<select value={projectType} onChange={(event) => setProjectType(event.target.value as ProjectType)} className="input"><option value="windows">Fenêtres et ouvrants</option><option value="insulation">Isolation / ITE</option><option value="electricity">Électricité</option><option value="plumbing">Plomberie</option><option value="hvac">PAC / chauffage</option><option value="global">Rénovation globale</option></select></label><label className="grid gap-2 text-sm font-bold text-ink/80">{isWindow ? "Nombre d'ouvrants" : "Surface concernée (m²)"}<input type="number" min="1" value={isWindow ? quantity : surface} onChange={(event) => isWindow ? setQuantity(Math.max(1, Number(event.target.value))) : setSurface(Math.max(1, Number(event.target.value)))} className="input" /></label></div><p className="mt-4 text-sm leading-6 text-ink/60">Estimation indicative, ajustée ensuite selon les dimensions, les matériaux, l'accès et la visite technique.</p></div><div className="rounded-card bg-navy p-5 text-white"><p className="text-xs font-black uppercase tracking-[.16em] text-champagne">Fourchette estimative</p><p className="mt-3 text-3xl font-black">{result.low.toLocaleString("fr-FR")} à {result.high.toLocaleString("fr-FR")} €</p><p className="mt-2 text-sm text-white/70">Point central : <strong className="text-white">{result.mid.toLocaleString("fr-FR")} €</strong></p><Link href="/simulateur" className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-card bg-white px-4 text-sm font-black text-navy transition hover:bg-pearl">Affiner poste par poste <ArrowRight size={16} /></Link></div></div><div className="flex flex-wrap gap-x-6 gap-y-2 border-t border-ink/10 bg-pearl px-5 py-4 text-sm font-bold text-navy md:px-7"><span>Prix visible à chaque choix</span><span>Options ajoutables</span><span>PDF détaillé après qualification</span></div></div>;
+  const { catalog, pricingError, pricingNotice } = usePricing();
+  const [projectType, setProjectType] = useState<ExpressProjectType>("windows");
+  const [amount, setAmount] = useState(4);
+  const counted = projectType === "windows" || projectType === "plumbing" || projectType === "electricity";
+  const forfait = projectType === "hvac";
+  const maximum = counted ? 1000 : 100000;
+  const valid = Number.isFinite(amount) && amount > 0 && amount <= maximum && (counted ? Number.isInteger(amount) : Number(amount.toFixed(2)) === amount);
+  const input = useMemo(() => valid ? buildExpressProjectInput(projectType, forfait ? 1 : amount) : null, [projectType, amount, valid, forfait]);
+  const calculation = useMemo(() => {
+    if (!input) return null;
+    try { return estimateProject(input, catalog); } catch { return null; }
+  }, [input, catalog]);
+  const scope = projectType === "windows" ? "Fenêtres PVC 125 × 135 cm, double vitrage et pose rénovation."
+    : projectType === "plumbing" ? "Points d’eau avec raccordement court eau et évacuation. Sans sanitaire ni réfection complète du réseau."
+    : projectType === "electricity" ? "Prises standard fournies et posées, avec liaison courte sur un circuit existant adapté. Tableau et circuits dédiés à choisir séparément."
+    : projectType === "hvac" ? "Une PAC air/eau avec mise en service. Puissance, raccordements et émetteurs à vérifier."
+    : projectType === "insulation" ? "Façade sous enduit PSE. Échafaudage et adaptations à confirmer."
+    : "Rénovation intermédiaire et coordination. Le périmètre reste à préciser.";
+  const label = projectType === "windows" ? "Combien de fenêtres ?" : projectType === "plumbing" ? "Combien de points d’eau ?" : projectType === "electricity" ? "Combien de prises ?" : projectType === "insulation" ? "Surface de façade (m²)" : "Surface concernée (m²)";
+  const href = `/simulateur?lot=${projectType}&quantite=${forfait ? 1 : amount}`;
+
+  return <div className={styles.tool}>
+    <div className={styles.form}>
+      <p className={styles.kicker}>Un premier repère</p>
+      <h3>Quels travaux imaginez-vous ?</h3>
+      <fieldset className={styles.choices}>
+        <legend className="sr-only">Choisir un poste de travaux</legend>
+        {choices.map(({ type, label: title, icon: Icon }) => <button key={type} type="button" aria-pressed={projectType === type} onClick={() => { setProjectType(type); setAmount(type === "windows" || type === "plumbing" || type === "electricity" ? 4 : type === "hvac" ? 1 : 80); }} className={styles.choice}>
+          <Icon size={22} aria-hidden="true" /><span>{title}</span>{projectType === type && <Check size={15} className={styles.check} aria-hidden="true" />}
+        </button>)}
+      </fieldset>
+      {forfait ? <p className={styles.forfait}>PAC air/eau · fourniture et installation d’un équipement</p> : <div className={styles.quantity}>
+        <label htmlFor="quick-amount">{label}</label>
+        <div className={styles.number}>
+          <button type="button" aria-label="Réduire la quantité" disabled={!valid || amount <= 1} onClick={() => setAmount(value => Math.max(1, value - 1))}><Minus size={18} /></button>
+          <input id="quick-amount" type="number" inputMode={counted ? "numeric" : "decimal"} min={counted ? 1 : 0.01} max={maximum} step={counted ? 1 : 0.01} value={Number.isFinite(amount) ? amount : ""} onChange={event => setAmount(Number(event.target.value))} aria-invalid={!valid} aria-describedby={!valid ? "quick-error" : undefined} />
+          <button type="button" aria-label="Augmenter la quantité" disabled={!valid || amount >= maximum} onClick={() => setAmount(value => Math.min(maximum, value + 1))}><Plus size={18} /></button>
+        </div>
+      </div>}
+      {!valid && <p id="quick-error" role="alert" className={styles.error}>Indiquez {counted ? "un nombre entier" : "une surface avec deux décimales au maximum"} supérieur à zéro, jusqu’à {maximum.toLocaleString("fr-FR")}.</p>}
+      <details className={styles.scope}><summary>Ce que couvre ce premier budget</summary><p>{scope}</p><p>{pricingError || pricingNotice}</p></details>
+    </div>
+    <div className={styles.budget}>
+      <p className={styles.kicker}>Votre enveloppe indicative</p>
+      <output className={styles.range} aria-live="polite" aria-atomic="true">{calculation ? <><span>{money(calculation.low)}</span><span className={styles.rangeTo}>à</span><span>{money(calculation.high)}</span></> : "À compléter"}</output>
+      <p className={styles.budgetNote}>Un repère pour avancer. Dimensions, matériaux et options s’affinent à l’étape suivante.</p>
+      {calculation ? <Link href={href} data-track="cta_click" data-track-label="Calculette express" className={styles.action}>Personnaliser ce budget <ArrowUpRight size={18} /></Link> : <span className={styles.disabledAction}>Complétez vos quantités pour continuer</span>}
+      <p className={styles.conditions}>Sans coordonnées pour estimer.<br />Prix et TVA à confirmer · aides non déduites.</p>
+    </div>
+  </div>;
 }

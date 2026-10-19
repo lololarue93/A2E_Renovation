@@ -1,30 +1,15 @@
-import type { Metadata } from "next";
-import { RealisationsPreview } from "@/components/marketing/RealisationsPreview";
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
+import { ProjectGallery } from "@/components/marketing/ProjectGallery";
+import { getPublicRealisations } from "@/lib/realisations/catalog";
+import { toGalleryProject } from "@/lib/realisations/gallery";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-import { SectionHeading } from "@/components/marketing/SectionHeading";
+export const metadata = { title: "Réalisations, avant / après & inspirations", description: "Explorez les chantiers publiés par A2E, leurs photos avant/après et des inspirations clairement identifiées pour votre rénovation en Île-de-France." };
 
-export const metadata: Metadata = {
-  title: "Réalisations avant/après",
-  description: "Réalisations démonstration A2E Rénovation en fenêtres, isolation, rénovation globale, cuisine et salle de bain."
-};
-
-export default function RealisationsPage() {
-  return (
-    <main>
-      <section className="photo-hero py-20 text-white">
-        <div className="container">
-          <p className="font-black uppercase tracking-[.16em] text-champagne">Avant / après</p>
-          <h1 className="mt-4 text-4xl font-black md:text-6xl">Réalisations A2E</h1>
-        </div>
-      </section>
-      <section className="section photo-wash">
-        <div className="container">
-          <SectionHeading eyebrow="Démonstration" title="6 projets prêts à remplacer par vos vrais chantiers" />
-          <RealisationsPreview limit={6} />
-        </div>
-      </section>
-    </main>
-  );
+export default async function RealisationsPage() {
+  const catalog = await getPublicRealisations();
+  const projects = catalog.map(toGalleryProject);
+  return <main id="main-content"><section className="page-heading"><div className="container"><p className="eyebrow">Réalisations / Avant & après / Inspirations</p><h1>Regarder les détails.<br />Imaginer la suite.</h1><p>Des photos à parcourir, des transformations à comparer et des idées à explorer. Chaque chantier publié se distingue clairement des projets fictifs aux images générées.</p><Link href="/simulateur" className="button-text">Donner forme à mon projet <ArrowUpRight size={17} /></Link></div></section><section className="section"><div className="container"><ProjectGallery projects={projects} /></div></section><section className="project-invitation"><div className="container"><h2>Une idée vous plaît ?<br />Parlons de votre habitat.</h2><Link href="/simulateur" className="button-light" data-track="gallery_estimate_clicked" data-track-label="inspiration">Composer mon estimation <ArrowUpRight size={18} /></Link></div></section></main>;
 }

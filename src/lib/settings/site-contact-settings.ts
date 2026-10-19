@@ -15,6 +15,7 @@ export const defaultSiteContactSettings: SiteContactSettings = {
 };
 
 export async function getSiteContactSettings(): Promise<SiteContactSettings> {
+  if (!process.env.DATABASE_URL) return defaultSiteContactSettings;
   const row = await prisma.siteSettings.findUnique({ where: { key: "site_contact" } }).catch(() => null);
   if (!row?.value || typeof row.value !== "object" || Array.isArray(row.value)) return defaultSiteContactSettings;
   return { ...defaultSiteContactSettings, ...(row.value as Partial<SiteContactSettings>) };

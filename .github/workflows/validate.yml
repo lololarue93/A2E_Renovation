@@ -2,7 +2,7 @@ name: Validate
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
   pull_request:
     branches: [main]
 
@@ -12,6 +12,20 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16.15-alpine3.23
+        env:
+          POSTGRES_DB: a2e_renovation
+          POSTGRES_USER: a2e
+          POSTGRES_PASSWORD: ci-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U a2e -d a2e_renovation"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       DATABASE_URL: postgresql://a2e:ci-password@localhost:5432/a2e_renovation?schema=public
       NEXT_PUBLIC_SITE_URL: http://localhost:3000
@@ -33,5 +47,9 @@ jobs:
         run: pnpm list @prisma/client prisma --depth 0
       - name: Generate Prisma client
         run: pnpm exec prisma generate
+      - name: Apply migrations on test database
+        run: pnpm exec prisma migrate deploy
+      - name: Verify calculations and protected workflows
+        run: pnpm run qa:check
       - name: Build application
         run: pnpm run build

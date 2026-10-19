@@ -1,44 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { requireAdmin } from "@/lib/auth/require-admin";
+import { validatePriceItem } from "@/lib/pricing/catalog-transfer";
 import { priceItems } from "@/lib/pricing/price-data";
 
 export const dynamic = "force-dynamic";
 
-const categories = new Set(["windows", "insulation", "electricity", "plumbing", "global", "hvac", "kitchen_bath", "roofing", "other"]);
-const units = new Set(["unit", "m2", "forfait", "point"]);
-
-function values(body: Record<string, unknown>) {
-  const key = typeof body.key === "string" ? body.key.trim().slice(0, 80) : "";
-  const label = typeof body.label === "string" ? body.label.trim().slice(0, 160) : key;
-  const category = typeof body.category === "string" && categories.has(body.category) ? body.category : "other";
-  const unit = typeof body.unit === "string" && units.has(body.unit) ? body.unit : "forfait";
-  const low = Number(body.low);
-  const mid = Number(body.mid);
-  const high = Number(body.high);
-  const vatRate = Number(body.vatRate);
-  return { key, label, category, unit, low, mid, high, vatRate: [5.5, 10, 20].includes(vatRate) ? vatRate : 10, reference: typeof body.reference === "string" ? body.reference.trim().slice(0, 160) : undefined, description: typeof body.description === "string" ? body.description.trim().slice(0, 500) : undefined };
+export async function GET(request: NextRequest) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+  if (!process.env.DATABASE_URL) return NextResponse.json({ items: priceItems, source: "demo" });
+  try {
+    const items = await prisma.priceItem.findMany({ where: { active: true }, orderBy: [{ category: "asc" }, { key: "asc" }] });
+    return NextResponse.json({ items, source: "database" });
+  } catch { return NextResponse.json({ error: "Base de prix indisponible. Reessayez avant de modifier le catalogue." }, { status: 503 }); }
 }
 
-export async function PUT(request: NextRequest) {
-  const body = await request.json().catch(() => ({}));
-  const { key, label, category, unit, low, mid, high, vatRate, reference, description } = values(body);
-  if (!key || ![low, mid, high].every(Number.isFinite) || low < 0 || low > mid || mid > high) return NextResponse.json({ ok: false, error: "Bornes de prix invalides" }, { status: 400 });
-  const source = priceItems.find((entry) => entry.key === key);
-  const item = await prisma.priceItem.upsert({
-    where: { key },
-    update: { label, category, unit, low: Math.round(low), mid: Math.round(mid), high: Math.round(high), vatRate, ...(reference !== undefined ? { reference } : {}), ...(description !== undefined ? { description } : {}) },
-    create: { key, category: source?.category ?? category, label: source?.label ?? label, unit: source?.unit ?? unit, low: Math.round(low), mid: Math.round(mid), high: Math.round(high), vatRate: source?.vatRate ?? vatRate, reference: source?.reference ?? reference, description: source?.description ?? description, active: true }
-  }).catch(() => null);
-  if (!item) return NextResponse.json({ ok: false, error: "Base de prix indisponible" }, { status: 503 });
-  return NextResponse.json({ ok: true, item });
+async function save(request: NextRequest, create: boolean) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+  if (!process.env.DATABASE_URL) return NextResponse.json({ error: "Base de donnees non configuree. Aucun tarif n'a ete modifie." }, { status: 503 });
+  let data;
+  try { data = validatePriceItem(await request.json()); }
+  catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Ligne invalide" }, { status: 400 }); }
+  try {
+    const item = await prisma.$transaction(async (tx) => {
+      const result = create ? await tx.priceItem.create({ data: { ...data, active: true } }) : await tx.priceItem.upsert({ where: { key: data.key }, update: data, create: { ...data, active: true } });
+      await tx.auditLog.create({ data: { actor: "admin", action: create ? "pricing.created" : "pricing.updated", entity: "PriceItem", entityId: result.id, payload: { key: result.key, label: result.label } } });
+      return result;
+    });
+    return NextResponse.json({ ok: true, item }, { status: create ? 201 : 200 });
+  } catch (error) {
+    const conflict = typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
+    return NextResponse.json({ error: conflict ? "Cette cle existe deja. Modifiez la ligne existante." : "Base de prix indisponible. Aucun tarif n'a ete modifie." }, { status: conflict ? 409 : 503 });
+  }
 }
-
-export async function POST(request: NextRequest) {
-  const body = await request.json().catch(() => ({}));
-  const { key, label, category, unit, low, mid, high, vatRate, reference, description } = values(body);
-  if (!key || !label || ![low, mid, high].every(Number.isFinite) || low < 0 || low > mid || mid > high) return NextResponse.json({ ok: false, error: "Ligne tarifaire invalide" }, { status: 400 });
-  const item = await prisma.priceItem.create({ data: { key, label, category, unit, low: Math.round(low), mid: Math.round(mid), high: Math.round(high), vatRate, reference, description, active: true } }).catch(() => null);
-  if (!item) return NextResponse.json({ ok: false, error: "La clé existe déjà ou la base est indisponible" }, { status: 409 });
-  await prisma.auditLog.create({ data: { actor: "admin", action: "pricing.created", entity: "PriceItem", entityId: item.id, payload: { key, label } } }).catch(() => undefined);
-  return NextResponse.json({ ok: true, item }, { status: 201 });
-}
+export const PUT = (request: NextRequest) => save(request, false);
+export const POST = (request: NextRequest) => save(request, true);

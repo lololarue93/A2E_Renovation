@@ -1,27 +1,64 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
-import { realisations as demoRealisations } from "@/lib/site-data";
+import { requireAdmin } from "@/lib/auth/require-admin";
+import { gallerySettingsKey } from "@/lib/realisations/gallery";
 
-export async function GET() {
-  const items = await prisma.realisation.findMany({ orderBy: { createdAt: "desc" } }).catch(() => []);
-  const fallback = demoRealisations.map((item, index) => ({ id: `demo-realisation-${index}`, ...item, description: `${item.title} - projet de demonstration A2E.`, active: true }));
-  return NextResponse.json({ realisations: fallback.map((item) => items.find((databaseItem) => databaseItem.id === item.id) ?? item).concat(items.filter((item) => !item.id.startsWith("demo-realisation-"))) });
+export const dynamic = "force-dynamic";
+const fields = z.object({
+  title: z.string().trim().min(3).max(160), city: z.string().trim().min(2).max(120),
+  type: z.string().trim().min(2).max(120), description: z.string().trim().min(10).max(2000),
+  duration: z.string().trim().max(80), budget: z.string().trim().max(120),
+  tags: z.array(z.string().trim().min(1).max(50)).max(8), active: z.boolean()
+});
+
+export async function GET(request: NextRequest) {
+  const denied = requireAdmin(request); if (denied) return denied;
+  try {
+    const [items, settings] = await Promise.all([
+      prisma.realisation.findMany({ orderBy: { createdAt: "desc" }, include: { media: { orderBy: { createdAt: "asc" } }, photos: { orderBy: { sortOrder: "asc" } } } }),
+      prisma.siteSettings.findMany({ where: { key: { startsWith: "gallery:" } } })
+    ]);
+    return NextResponse.json({ realisations: items.map(item => ({ ...item, isDemo: item.id.startsWith("demo-realisation-"), galleryManifest: settings.find(row => row.key === gallerySettingsKey(item.id))?.value })) }, { headers: { "Cache-Control": "no-store" } });
+  } catch { return NextResponse.json({ error: "La base est indisponible. Impossible de charger les fiches." }, { status: 503 }); }
+}
+
+export async function POST(request: NextRequest) {
+  const denied = requireAdmin(request); if (denied) return denied;
+  const parsed = fields.strict().safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "Renseignez un titre, une ville, un type et une description. Vérifiez la longueur des champs et des tags." }, { status: 400 });
+  if (parsed.data.active) return NextResponse.json({ error: "Créez d'abord la fiche en brouillon, puis ajoutez une photo avant de publier." }, { status: 400 });
+  try {
+    const item = await prisma.$transaction(async tx => {
+      const created = await tx.realisation.create({ data: parsed.data });
+      await tx.auditLog.create({ data: { actor: process.env.ADMIN_EMAIL, action: "realisation.created", entity: "Realisation", entityId: created.id, payload: { title: created.title, active: false } } });
+      return created;
+    });
+    return NextResponse.json({ ok: true, realisation: item }, { status: 201 });
+  } catch { return NextResponse.json({ error: "Création impossible. La fiche n'a pas été enregistrée." }, { status: 503 }); }
 }
 
 export async function PUT(request: NextRequest) {
-  const body = await request.json().catch(() => ({}));
-  const id = typeof body.id === "string" ? body.id : "";
-  const source = id.match(/^demo-realisation-(\d+)$/)?.[1];
-  const fallbackSource = source && demoRealisations[Number(source)] ? demoRealisations[Number(source)] : demoRealisations[0];
-  const fallback = { ...fallbackSource, description: `${fallbackSource.title} - projet de demonstration A2E.` };
-  if (!id || !fallback) return NextResponse.json({ ok: false, error: "Realisation invalide" }, { status: 400 });
-  const text = (value: unknown, defaultValue: string, max = 500) => typeof value === "string" && value.trim() ? value.trim().slice(0, max) : defaultValue;
-  const tags = Array.isArray(body.tags) ? body.tags.filter((tag: unknown): tag is string => typeof tag === "string").map((tag: string) => tag.trim()).filter(Boolean).slice(0, 8) : fallback.tags;
-  const item = await prisma.realisation.upsert({
-    where: { id },
-    update: { title: text(body.title, fallback.title, 160), city: text(body.city, fallback.city, 120), type: text(body.type, fallback.type, 120), description: text(body.description, fallback.description, 800), duration: text(body.duration, fallback.duration, 80), budget: text(body.budget, fallback.budget, 120), tags, active: body.active !== false },
-    create: { id, title: text(body.title, fallback.title, 160), city: text(body.city, fallback.city, 120), type: text(body.type, fallback.type, 120), description: text(body.description, fallback.description, 800), duration: text(body.duration, fallback.duration, 80), budget: text(body.budget, fallback.budget, 120), tags, active: body.active !== false }
-  }).catch(() => null);
-  if (!item) return NextResponse.json({ ok: false, error: "Enregistrement impossible" }, { status: 503 });
-  return NextResponse.json({ ok: true, realisation: item });
+  const denied = requireAdmin(request); if (denied) return denied;
+  const parsed = fields.extend({ id: z.string().min(1).max(100) }).strict().safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "Fiche invalide. Titre, ville, type et description sont obligatoires." }, { status: 400 });
+  const { id, ...data } = parsed.data;
+  try {
+    const result = await prisma.$transaction(async tx => {
+      const existing = await tx.realisation.findUnique({ where: { id }, select: { id: true } });
+      if (!existing) return { error: "Fiche introuvable. Créez un projet pour commencer.", status: 404 };
+      if (data.active) {
+        const [media, photo] = await Promise.all([
+          tx.mediaAsset.findFirst({ where: { realisationId: id, kind: "image" } }),
+          tx.realisationPhoto.findFirst({ where: { realisationId: id, OR: [{ beforeUrl: { not: null } }, { afterUrl: { not: null } }] } })
+        ]);
+        if (!media && !photo) return { error: "Ajoutez au moins une photo avant de publier cette réalisation.", status: 400 };
+      }
+      const saved = await tx.realisation.update({ where: { id }, data });
+      await tx.auditLog.create({ data: { actor: process.env.ADMIN_EMAIL, action: "realisation.updated", entity: "Realisation", entityId: id, payload: { title: saved.title, active: saved.active } } });
+      return { item: saved };
+    }, { isolationLevel: "Serializable" });
+    if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
+    return NextResponse.json({ ok: true, realisation: result.item });
+  } catch { return NextResponse.json({ error: "Enregistrement impossible. Les modifications n'ont pas été confirmées." }, { status: 503 }); }
 }

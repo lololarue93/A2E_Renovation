@@ -1,0 +1,59 @@
+{
+  "tool": "image_gen.imagegen (built-in)",
+  "fictional": true,
+  "notice": "Projets fictifs et images generees, pas des chantiers A2E.",
+  "generationDate": "2026-10-19",
+  "assets": [
+    {
+      "key": "melun-avant",
+      "prompt": "Use case: photorealistic-natural. Asset type: fictional renovation demonstration photograph for a French home renovation website. Primary request: the BEFORE state of an ordinary older stone house living room near Melun, Seine-et-Marne, France. A single realistic architectural interior photograph, landscape 3:2. Empty unfurnished rectangular living room, approximately 5 by 4 metres, camera in rear left corner at eye level 1.5 metres, natural 28mm architectural lens, straight verticals. On far wall one tall two-leaf French window centered, showing a modest leafy garden; a small closed plain wooden door on right wall near far corner. A broad original rough local pale limestone wall at left, smoke-yellowed pale cream plaster elsewhere, one dark timber ceiling beam crossing horizontally, old worn brown tiled floor, old small white radiator beneath a section of right wall, a few scuffs and tired finishes but structurally sound and dry. Soft overcast daylight. Believable French house proportions, restrained everyday housing, no luxury mansion. No people, no text, no numbers, no logo, no watermark, no split screen, no collage, no border. This is a fictional example, not documentation of a real contractor project. Preserve a composition that can later be renovated with all walls, openings, beam and camera position unchanged.",
+      "source": "C:/Users/lorri/.codex/generated_images/01a1535b-3fd3-7bc0-8b57-44f635ac5744/exec-d6e6a13d-98e9-4fe4-8528-3eb4cbb3ba16.png",
+      "output": "public/branding/realisations-demo/melun-avant.webp",
+      "width": 1200,
+      "height": 800
+    },
+    {
+      "key": "meaux-avant",
+      "prompt": "Use case: photorealistic-natural. Asset type: fictional renovation demonstration photograph for a French home renovation website. Primary request: the BEFORE state of a 1980s detached pavilion kitchen and dining room near Meaux, Seine-et-Marne, France. One realistic architectural interior photo, landscape 3:2. Camera in the room entrance rear right corner, eye height 1.5 metres, 28mm lens, straight verticals. Modest rectangular open room, roughly 6 by 4 metres. Back wall has one horizontal two-leaf window above the kitchen sink on left half; right wall has one two-leaf glazed garden door near the far corner. L-shaped dated honey-oak kitchen units run on back wall and left wall, beige laminate counter, small white freestanding cooker, beige square tile backsplash, terracotta-brown square ceramic floor across room. Faded off-white walls, low plain ceiling with one simple old ceiling light, visibly tired handles and finishes. Foreground right is an empty dining space, no furniture, no clutter. Soft overcast daylight, normal realistic modest house, structurally sound and dry. No people, no text, no numbers, no logo, no watermark, no split screen, no collage, no border. Fictional example, not a real contractor project. Composition must allow renovation without changing room geometry, window, garden door or camera.",
+      "source": "C:/Users/lorri/.codex/generated_images/01a1535b-3fd3-7bc0-8b57-44f635ac5744/exec-03d2c6ea-2e79-4ca3-9566-4ca030508ebc.png",
+      "output": "public/branding/realisations-demo/meaux-avant.webp",
+      "width": 1200,
+      "height": 800
+    },
+    {
+      "key": "fontainebleau-avant",
+      "prompt": "Use case: photorealistic-natural. Asset type: fictional renovation demonstration photograph for a French home renovation website. Primary request: BEFORE state of an older house bathroom near Fontainebleau, Seine-et-Marne, France. A single realistic architectural interior photo, landscape 3:2. Modest rectangular bathroom approximately 3.4 by 2.5 metres, photographed from doorway at eye height 1.5 metres with realistic 24mm architectural lens and straight verticals. Back wall has one small centered frosted glass window high above a cream bathtub spanning the back wall. A dated single white basin on a small varnished wooden vanity stands against left wall midway into room, chrome tap and rectangular mirror above it. Small wall radiator on right wall. Faded light peach wall tiles on lower two thirds, upper walls off-white, dated beige ceramic floor, ordinary white ceiling, tired discolored sealant and scuffed finishes but no dramatic dirt or damage. No toilet visible. Soft diffuse daylight. Believable French home scale. No people, no text, no numbers, no logos, no watermark, no split screen, no collage, no border. Fictional example, not documentation of a real contractor project. Keep room, openings, camera and plumbing wall positions suitable for a matched renovation edit.",
+      "source": "C:/Users/lorri/.codex/generated_images/01a1535b-3fd3-7bc0-8b57-44f635ac5744/exec-f305aaf2-75d7-4f70-9522-7883456e9b9d.png",
+      "output": "public/branding/realisations-demo/fontainebleau-avant.webp",
+      "width": 1200,
+      "height": 800
+    },
+    {
+      "key": "melun-apres",
+      "reference": "melun-avant",
+      "prompt": "Use case: precise-object-edit. Asset type: AFTER photograph for a clearly fictional French home renovation example. Input image 1 is the edit target: before state of a stone house living room near Melun, Seine-et-Marne. Create a realistic completed renovation of this exact same empty room, matching the original photograph pixel composition as closely as possible. Retain original rough limestone left wall, clean and repoint it naturally; retain the exact timber beam and refinish it lightly without changing shape; retain the exact French window and closed right-wall door, all openings, walls, ceiling heights, garden view, radiator location, camera position, focal length, crop, perspective and dimensions. Change only finishes and equipment: smooth warm ivory plaster, carefully refinished natural warm wood door, new pale natural oak plank floor running towards the window with simple white skirting, discrete modern white radiator in exactly same place. Soft natural daylight with believable warm neutral room balance, no added windows, no wall removal, no ceiling changes, no furniture or staging objects. High quality architectural photography with tactile materials and straight verticals. Landscape 3:2. No people, no text, no numbers, no logo, no watermark, no collage, no before-after split. This is a generated fictional renovation, not a real contractor reference.",
+      "source": "C:/Users/lorri/.codex/generated_images/01a1535b-3fd3-7bc0-8b57-44f635ac5744/exec-b1516907-a8c6-4611-9ae9-fe846fbccde6.png",
+      "output": "public/branding/realisations-demo/melun-apres.webp",
+      "width": 1200,
+      "height": 800
+    },
+    {
+      "key": "meaux-apres",
+      "reference": "meaux-avant",
+      "prompt": "Use case: precise-object-edit. Asset type: AFTER photograph for a clearly fictional French home renovation example. Input image 1 is the edit target: before state of a 1980s pavilion kitchen and dining room near Meaux, Seine-et-Marne. Renovate this exact same room with close pixel alignment, preserving every room boundary, ceiling height, back-wall window and its location, right-wall glazed garden door and its location, outdoor view, camera position, lens, framing, perspective and crop. Keep an L-shaped kitchen along exactly the same two walls with the sink under the existing window and cooking at the same left wall position. Replace old units by understated matte warm-white flat fronts below and a few pale oak upper cabinets at left, pale stone-effect worktop and backsplash, integrated stainless oven with dark glass below a simple black induction hob, flush compact discreet extractor. New large light warm-grey porcelain floor tiles, smooth off-white walls, one understated small contemporary ceiling pendant at the existing light point. Keep the dining area foreground empty, no island, no new furniture, no decor clutter, no structural opening. Photorealistic ordinary quality French house renovation, realistic construction and daylight, no impossible luxury. Landscape 3:2. No people, text, numbers, logos, watermark, collage or before-after split. Generated fictional example, not a real contractor project.",
+      "source": "C:/Users/lorri/.codex/generated_images/01a1535b-3fd3-7bc0-8b57-44f635ac5744/exec-3eb1bc0a-44aa-4f0d-9e7a-b7545de78210.png",
+      "output": "public/branding/realisations-demo/meaux-apres.webp",
+      "width": 1200,
+      "height": 800
+    },
+    {
+      "key": "fontainebleau-apres",
+      "reference": "fontainebleau-avant",
+      "prompt": "Use case: precise-object-edit. Asset type: AFTER photograph for a clearly fictional French home renovation example. Input image 1 is the edit target: before state of an older house bathroom near Fontainebleau, Seine-et-Marne. Create the completed renovation of this exact same bathroom, with close pixel alignment. Keep all walls and their limits, ceiling, exact centered high frosted window size and location, foreground doorway edge, camera position, 24mm focal length, eye height, crop and perspective unchanged. Replace the bath spanning the back wall by a wide low-profile white shower tray within that exact footprint and a simple clear fixed shower glass panel on right part, with chrome shower fittings at the left end where bath taps were. New medium-size warm light-stone porcelain tiles, smooth ivory upper walls. At the exact same left wall vanity footprint, install a modern wall-hung pale oak vanity with one white basin and simple round mirror above. Replace right radiator with a narrow white towel radiator on same right-wall position. Clean realistic waterproof joints, believable practical quality, no decorative clutter, no people, no toilet, no new window, no widened room, no layout shift. Natural diffuse daylight, architectural photography, landscape 3:2. No text, numbers, logos, watermark, collage or before-after split. Generated fictional renovation, not a real contractor reference.",
+      "source": "C:/Users/lorri/.codex/generated_images/01a1535b-3fd3-7bc0-8b57-44f635ac5744/exec-874ce1dd-65ae-4e28-bb1c-ffd80e3eb091.png",
+      "output": "public/branding/realisations-demo/fontainebleau-apres.webp",
+      "width": 1200,
+      "height": 800
+    }
+  ]
+}

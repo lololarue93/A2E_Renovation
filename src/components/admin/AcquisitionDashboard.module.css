@@ -1,0 +1,28 @@
+.panel { margin-top: 1.75rem; padding: clamp(1rem, 2.5vw, 1.75rem); border: 1px solid #1530441a; border-radius: 1rem; background: white; min-width: 0; }
+.heading { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 1rem; }
+.heading h2 { color: #153044; font-size: clamp(1.25rem, 2vw, 1.5rem); font-weight: 800; }
+.eyebrow { margin-bottom: .5rem; color: #746047; font-size: .7rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+.note { color: #53616c; font-size: .75rem; line-height: 1.8; }
+.flow { list-style: none; margin: 1.5rem 0; padding: 0; display: grid; gap: 1rem; }
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .4rem .8rem; align-items: center; }
+.label { color: #153044; font-size: .875rem; font-weight: 650; }
+.count { color: #153044; font-size: 1.25rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.track { height: .55rem; background: #eff1f0; overflow: hidden; border-radius: .2rem; }
+.bar { height: 100%; background: #527769; }
+.rate { font-size: .7rem; color: #53616c; text-align: right; font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1.5rem; color: #53616c; font-size: .75rem; }
+.legend span { display: inline-flex; align-items: center; gap: .45rem; }
+.swatch { width: .85rem; height: .2rem; background: #153044; }
+.green { background: #527769; }
+.chart { display: block; width: 100%; height: auto; margin-top: .7rem; overflow: visible; }
+.chart text { font-size: 12px; fill: #697781; }
+.tableWrap { overflow-x: auto; margin-top: 1rem; }
+.table { width: 100%; border-collapse: collapse; text-align: left; color: #53616c; font-size: .8rem; }
+.table th { font-size: .7rem; font-weight: 650; color: #53616c; }
+.table th, .table td { padding: .8rem .5rem; border-bottom: 1px solid #1530441a; }
+.table td:not(:first-child), .table th:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+.table tbody th { font-size: .8rem; color: #153044; white-space: nowrap; }
+.details { margin-top: 1rem; font-size: .75rem; color: #53616c; }
+.details summary { display: flex; align-items: center; min-height: 2.75rem; cursor: pointer; text-decoration: underline; }
+.empty { margin: 1.5rem 0; padding: 1rem 0; color: #53616c; font-size: .875rem; line-height: 1.8; }
+@media (min-width: 1024px) { .acquisition { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 2rem; align-items: start; } }

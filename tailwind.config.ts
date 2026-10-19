@@ -5,13 +5,13 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        navy: "#051637",
-        ink: "#14233f",
-        champagne: "#b9aa8a",
+        navy: "#142e32",
+        ink: "#273d40",
+        champagne: "#a28a60",
         gold: "#c6b27a",
         silver: "#d8d9d6",
-        pearl: "#faf8f3",
-        mist: "#f3f5f8",
+        pearl: "#f5f3ec",
+        mist: "#edf2ee",
         success: "#2d6a4f"
       },
       boxShadow: {

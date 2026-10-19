@@ -1,10 +1,5 @@
+import Link from "next/link";
+import { siteSettings } from "@/lib/site-data";
 export default function LegalPage() {
-  return (
-    <main className="section">
-      <div className="container max-w-3xl">
-        <h1 className="text-4xl font-black text-navy">Mentions légales</h1>
-        <p className="mt-6 leading-7 text-ink/72">Mentions légales placeholder à compléter avec les informations juridiques exactes de A2E Rénovation: SIRET, adresse, représentant légal, hébergeur, directeur de publication et assurances.</p>
-      </div>
-    </main>
-  );
+ return <main id="main-content"><section className="page-heading"><div className="container"><p className="eyebrow">Informations du site</p><h1>Mentions légales</h1><p>Le site présente les services de {siteSettings.company} et permet de préparer une demande de travaux en Île-de-France.</p></div></section><section className="section"><div className="container max-w-3xl space-y-8"><div><h2 className="text-xl font-semibold">Contact</h2><p className="mt-3 leading-7">Pour toute question : <a className="underline" href={"mailto:"+siteSettings.email}>{siteSettings.email}</a>.</p></div><div className="border-y border-navy/15 py-6"><h2 className="text-xl font-semibold">Informations à compléter avant publication</h2><p className="mt-3 leading-7 text-ink/70">Cette version est une prévisualisation. La raison sociale exacte, le SIRET, l’adresse du siège, le directeur de publication, l’hébergeur, le médiateur et les références des assurances doivent être renseignés avec les justificatifs de l’entreprise.</p></div><div><h2 className="text-xl font-semibold">Estimations et qualifications</h2><p className="mt-3 leading-7 text-ink/70">Les prix et PDF sont indicatifs. Les quantités, les références, les prestations, la TVA et les conditions sont confirmées sur un devis après étude technique. Une qualification RGE doit être vérifiée pour le métier concerné et sa période de validité.</p></div><div><h2 className="text-xl font-semibold">Images et réalisations</h2><p className="mt-3 leading-7 text-ink/70">Les images d’inspiration sont identifiées. Les réalisations publiées dans la galerie doivent disposer des autorisations de diffusion nécessaires.</p></div><Link href="/politique-confidentialite" className="button-text">Consulter la confidentialité →</Link></div></section></main>;
 }

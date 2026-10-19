@@ -1,0 +1,9 @@
+# Use with docker-compose.yml only for an explicit move/restore of existing data.
+# Portainer Git: primary Compose path + this file in Additional paths.
+volumes:
+  a2e_postgres:
+    external: true
+    name: ${A2E_POSTGRES_VOLUME:?Set the exact existing or restored PostgreSQL volume name}
+  a2e_media:
+    external: true
+    name: ${A2E_MEDIA_VOLUME:?Set the exact existing or restored media volume name}

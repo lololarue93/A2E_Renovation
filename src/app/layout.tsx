@@ -2,10 +2,15 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import "./globals.css";
+import { SiteHeader } from "@/components/marketing/SiteHeader";
+import { ArrowUpRight } from "lucide-react";
 import { siteSettings } from "@/lib/site-data";
 import { AnalyticsTracker } from "@/components/analytics/AnalyticsTracker";
+import { AnalyticsPreferenceButton } from "@/components/analytics/AnalyticsPreferences";
 import { SocialLinks } from "@/components/marketing/SocialLinks";
 import { getSiteContactSettings } from "@/lib/settings/site-contact-settings";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://a2e-renovation.local"),
@@ -32,7 +37,7 @@ export const metadata: Metadata = {
       url: "/branding/a2e-exterior-premium.jpeg",
       width: 1440,
       height: 1080,
-      alt: "Projet de rénovation extérieure A2E Renovation"
+      alt: "Inspiration de rénovation extérieure, illustration A2E"
     }]
   },
   twitter: {
@@ -43,90 +48,13 @@ export const metadata: Metadata = {
   }
 };
 
-const nav = [
-  ["Services", "/services/remplacement-fenetres"],
-  ["Réalisations", "/realisations"],
-  ["Simulateur", "/simulateur"],
-  ["Équipe", "/equipe"],
-  ["Aides", "/aides"],
-  ["Contact", "/contact"]
-];
-
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const contact = await getSiteContactSettings();
-  return (
-    <html lang="fr">
-      <body>
-        <AnalyticsTracker />
-        <header className="sticky top-0 z-50 border-b border-navy/10 bg-white/95 text-navy shadow-[0_8px_28px_rgba(5,22,55,0.05)] backdrop-blur">
-          <div className="container flex min-h-16 items-center justify-between gap-4">
-            <Link href="/" className="flex min-h-11 items-center gap-3 font-black tracking-wide" aria-label="Accueil A2E Rénovation">
-              <span className="a2e-logo-panel relative h-12 w-[5.4rem] overflow-hidden rounded-card">
-                <Image src="/branding/a2e-logo.jpeg" alt="Logo A2E Rénovation" fill sizes="86px" className="object-contain p-1.5" priority />
-              </span>
-              <span className="hidden leading-tight sm:block">{siteSettings.company}</span>
-            </Link>
-            <nav className="hidden items-center gap-6 text-sm font-semibold text-ink/72 lg:flex">
-              {nav.map(([label, href]) => (
-                <Link key={href} href={href} className="transition hover:text-navy">
-                  {label}
-                </Link>
-              ))}
-            </nav>
-            <Link href="/simulateur" data-track="quote_started" data-track-label="Header - Estimer mon projet" className="hidden min-h-11 items-center rounded-card bg-navy px-4 text-sm font-extrabold text-white transition hover:bg-[#0b244f] md:inline-flex">
-              Estimer mon projet
-            </Link>
-          </div>
-          <nav className="container flex gap-2 overflow-x-auto pb-3 text-sm font-bold text-ink/68 lg:hidden" aria-label="Navigation mobile">
-            {nav.slice(0, 5).map(([label, href]) => (
-              <Link key={href} href={href} className="shrink-0 rounded-card border border-navy/10 bg-white px-3 py-2">
-                {label}
-              </Link>
-            ))}
-          </nav>
-        </header>
-        {children}
-        <Link href="/simulateur" className="mobile-estimate">
-          Estimer mon projet
-        </Link>
-        <footer className="bg-navy py-12 text-white">
-          <div className="container grid gap-8 md:grid-cols-[1.3fr_1fr_1fr]">
-            <div>
-              <A2EVisualSignature compact />
-              <p className="mt-5 max-w-xl text-sm leading-7 text-white/72">
-                Pré-devis indicatif, accompagnement rénovation énergétique et suivi de chantier en Île-de-France.
-              </p>
-            </div>
-            <div className="text-sm leading-7 text-white/78">
-              <strong className="text-white">Contact</strong>
-              <p><a href={`tel:${contact.phone.replace(/[^+\d]/g, "")}`}>{contact.phone}</a></p>
-              <p><a href={`mailto:${siteSettings.email}`}>{siteSettings.email}</a></p>
-              <p>Réseaux : {siteSettings.social}</p>
-              <div className="mt-3"><SocialLinks /></div>
-            </div>
-            <div className="text-sm leading-7 text-white/78">
-              <strong className="text-white">Informations</strong>
-              <p><Link href="/mentions-legales">Mentions légales</Link></p>
-              <p><Link href="/politique-confidentialite">Confidentialité</Link></p>
-              <p className="pt-2 text-xs">Certifications et qualifications à confirmer selon les informations légales et administratives de l'entreprise.</p>
-            </div>
-          </div>
-        </footer>
-      </body>
-    </html>
-  );
-}
-
-function A2EVisualSignature({ compact = false }: { compact?: boolean }) {
-  return (
-    <div className="flex items-center gap-3">
-      <div className={`${compact ? "h-12 w-[5.5rem]" : "h-16 w-[7rem]"} a2e-logo-panel relative overflow-hidden rounded-card`}>
-        <Image src="/branding/a2e-logo.jpeg" alt="Logo A2E Rénovation" fill sizes={compact ? "88px" : "112px"} className="object-contain p-1.5" />
-      </div>
-      <div>
-        <p className="font-black">{siteSettings.company}</p>
-        <p className="text-sm text-white/65">Rénovation premium & accompagnement travaux</p>
-      </div>
-    </div>
-  );
+  return <html lang="fr"><body><AnalyticsTracker />{process.env.A2E_LOCAL_RECIPE === "true" && <div role="note" className="border-b border-navy/15 bg-[#e9ede5] px-4 py-2 text-center text-sm text-navy">Version de démonstration · Données de recette, prix à valider avant devis.</div>}<SiteHeader phone={contact.phone} />{children}
+    <footer className="site-footer"><div className="container"><div className="footer-grid">
+      <div><Link href="/" className="brand"><Image src="/branding/a2e-logo.jpeg" alt="Logo A2E Rénovation" width={83} height={47} /><span>RÉNOVATION<span>Penser. Transformer. Habiter.</span></span></Link><p>Votre partenaire pour repenser votre habitat, poste par poste, en Île-de-France.</p><SocialLinks /></div>
+      <div><h3>Parlons de votre projet</h3><a href={`tel:${contact.phone.replace(/[^+\d]/g, "")}`}>{contact.phone}</a><a href={`mailto:${siteSettings.email}`}>{siteSettings.email}</a><p>Île-de-France<br />Seine-et-Marne · Seine-Saint-Denis · Val-d’Oise</p></div>
+      <div><h3>Explorer A2E</h3><Link href="/services">Nos expertises</Link><Link href="/realisations">Galerie & inspirations</Link><Link href="/simulateur">Estimer mes travaux</Link><Link href="/tarifs">Repères de prix</Link><Link href="/equipe">Notre équipe</Link><Link href="/admin">Espace équipe <ArrowUpRight size={13} className="inline" /></Link></div>
+    </div><div className="footer-bottom"><span>© {new Date().getFullYear()} {siteSettings.company}</span><div className="flex flex-wrap gap-5"><Link href="/mentions-legales">Mentions légales</Link><Link href="/politique-confidentialite">Confidentialité</Link><AnalyticsPreferenceButton /></div><span>Conçu pour vos projets. Pensé dans le détail.</span></div></div></footer>
+  </body></html>;
 }

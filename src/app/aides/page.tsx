@@ -1,28 +1,15 @@
-import type { Metadata } from "next";
-import { SectionHeading } from "@/components/marketing/SectionHeading";
-import { TrustBadges } from "@/components/trust/TrustBadges";
-
-export const metadata: Metadata = {
-  title: "Aides & accompagnement",
-  description: "Accompagnement indicatif A2E Rénovation sur les aides à la rénovation énergétique."
-};
-
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
+import { AidExplorer } from "@/components/calculators/AidExplorer";
+import { aidSnapshot } from "@/lib/pricing/aid-data";
+export const metadata = { title:"Aides 2026 & repères 2027", description:"MaPrimeRenov, CEE, eco-PTZ : conditions 2026, plafonds Ile-de-France et changements 2027 deja publies." };
+const sources=aidSnapshot.sources;
+const blocks=[
+ {number:"01",title:"Rénovation d’ampleur",text:"Logement E, F ou G, au moins deux gestes d’isolation et gain d’au moins deux classes. Audit, rendez-vous France Rénov’ et Mon Accompagnateur Rénov’ sont requis. Une maison conservant le gaz ne peut plus bénéficier de ce parcours depuis septembre 2026.",link:sources.ampleur,label:"France Rénov’"},
+ {number:"02",title:"Travaux par geste",text:"Depuis septembre 2026, isolation, fenêtres, ventilation, chauffage au bois et chauffe-eau thermodynamique sortent de ce parcours en métropole. Les PAC air/eau et géothermiques restent des pistes, selon les conditions techniques et le profil.",link:sources.decree,label:"Décret applicable depuis le 1er septembre"},
+ {number:"03",title:"Certificats d’économies d’énergie",text:"Les CEE couvrent la période 2026–2030. Leur montant dépend de l’opération et de l’offre du fournisseur : il ne s’agit pas d’un forfait national uniforme. Vérifiez l’offre avant de vous engager sur les travaux.",link:sources.cee,label:"Ministère de la Transition écologique"},
+ {number:"04",title:"Financer le reste du projet",text:"L’éco-PTZ est un prêt sans intérêts, sans condition de ressources, soumis à l’accord bancaire. Il peut atteindre 50 000 € selon les travaux et le parcours. Les aides locales et la TVA réduite se vérifient séparément.",link:sources.ecoPtz,label:"Éco-PTZ · Service Public"}
+];
 export default function AidesPage() {
-  return (
-    <main>
-      <section className="photo-hero py-20 text-white">
-        <div className="container">
-          <p className="font-black uppercase tracking-[.16em] text-champagne">Accompagnement</p>
-          <h1 className="mt-4 text-4xl font-black md:text-6xl">Aides & dossier travaux</h1>
-          <p className="mt-5 max-w-2xl text-white/76">A2E aide à structurer le dossier, sans garantir l'obtention des aides qui dépend des critères officiels et de la situation du foyer.</p>
-        </div>
-      </section>
-      <section className="section photo-wash">
-        <div className="container">
-          <SectionHeading eyebrow="Prudence" title="Un accompagnement sérieux, des mentions claires" text="Certifications et qualifications à confirmer selon les informations légales et administratives de l'entreprise. Les aides potentielles restent indicatives et non garanties." />
-          <TrustBadges />
-        </div>
-      </section>
-    </main>
-  );
+ return <main id="main-content"><section className="page-heading"><div className="container"><p className="eyebrow">Accompagnement · sources officielles</p><h1>Vos travaux.<br />Les aides, en perspective.</h1><p>Des règles 2026 précises et les changements 2027 déjà publiés, pour préparer un dossier cohérent. Vérification : 6 octobre 2026.</p><a href={sources.guide} target="_blank" rel="noreferrer" className="button-text">Guide officiel Anah 2026 <ArrowUpRight size={17} /></a></div></section><section className="section"><div className="container"><AidExplorer /></div></section><section className="section estimate-section"><div className="container"><div className="section-intro"><div><p className="eyebrow">Comprendre les parcours</p><h2>Le bon dispositif.<br />Dans le bon ordre.</h2></div><p>Une aide se prépare avant le chantier. Les certifications requises, le devis, les caractéristiques du logement et la chronologie doivent être vérifiés avant engagement.</p></div><div className="grid gap-6 md:grid-cols-2">{blocks.map(b=><article className="border-t border-ink/20 pt-6 pb-4" key={b.number}><span className="text-sm text-champagne">{b.number}</span><h2 className="mt-3 text-2xl font-semibold">{b.title}</h2><p className="mt-4 text-sm leading-7 text-ink/70">{b.text}</p><a className="button-text underline mt-3" href={b.link} target="_blank" rel="noreferrer">{b.label} <ArrowUpRight size={16} /></a></article>)}</div></div></section><section className="section"><div className="container grid gap-8 md:grid-cols-2"><div><p className="eyebrow">Préparer votre échange</p><h2 className="text-3xl font-semibold">Un dossier mieux préparé.<br />Une décision plus sereine.</h2></div><ol className="list-decimal pl-5 space-y-4 text-sm leading-7 text-ink/70"><li>Rassemblez DPE ou audit, avis d’imposition et informations sur le logement.</li><li>Comparez les scénarios de travaux et les devis ; vérifiez les qualifications RGE pour les lots concernés.</li><li>Demandez conseil à France Rénov’ et respectez l’ordre des démarches avant de commencer les travaux.</li><li>Conservez devis, justificatifs et factures pour le paiement des aides.</li></ol></div></section><section className="project-invitation"><div className="container"><h2>D’abord le projet.<br />Puis le bon parcours.</h2><Link className="button-light" href="/simulateur">Composer mes travaux <ArrowUpRight size={18} /></Link></div></section></main>;
 }
