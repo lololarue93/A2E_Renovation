@@ -24,7 +24,7 @@ async function main() {
   assert.equal(customerReviewsSchema.safeParse({ ...valid, extra: "unexpected" }).success, false);
   assert.deepEqual(publishedCustomerReviews({ ...valid, reviews: [fixture, { ...fixture, id: "not-consented", published: true }, { ...fixture, id: "visible-old", published: true, consentConfirmed: true, date: "2025-01-01" }, { ...fixture, id: "visible-new", published: true, consentConfirmed: true }] }).map(review => review.id), ["visible-new", "visible-old"], "Filtre public : publication et accord obligatoires, ordre de date");
 
-  const original = { email: process.env.ADMIN_EMAIL, password: process.env.ADMIN_PASSWORD, database: process.env.DATABASE_URL, findUnique: prisma.siteSettings.findUnique, transaction: prisma.$transaction };
+  const original = { email: process.env.ADMIN_EMAIL, password: process.env.ADMIN_PASSWORD, secret: process.env.AUTH_SECRET, database: process.env.DATABASE_URL, findUnique: prisma.siteSettings.findUnique, transaction: prisma.$transaction };
   let stored: unknown = null;
   let reads = 0; let writes = 0; let failRead = false; let failWrite = false; let failAudit = false;
   let conflictCode = ""; let interfereAfterCommit = false;
@@ -61,7 +61,7 @@ async function main() {
 
     for (const [handler, method] of [[GET, "GET"], [PUT, "PUT"]] as const) assert.equal((await handler(request(method, undefined, false))).status, 401);
     assert.equal(reads, 0, "Acces refuse avant lecture"); assert.equal(writes, 0, "Acces refuse avant ecriture");
-    delete process.env.ADMIN_PASSWORD;
+    delete process.env.ADMIN_PASSWORD; delete process.env.AUTH_SECRET;
     assert.equal((await PUT(request("PUT", valid))).status, 503, "Configuration auth manquante refusee");
     assert.equal(writes, 0); process.env.ADMIN_PASSWORD = "reviews-only-test";
     const empty = await GET(request()); assert.equal(empty.status, 200); assert.equal(empty.headers.get("cache-control"), "no-store");
@@ -104,7 +104,7 @@ async function main() {
     delete process.env.DATABASE_URL; const readsBeforeNoDatabase = reads; assert.deepEqual(await getPublicCustomerReviews(), []); assert.equal(reads, readsBeforeNoDatabase);
   } finally {
     prisma.siteSettings.findUnique = original.findUnique; prisma.$transaction = original.transaction;
-    for (const [key, value] of [["ADMIN_EMAIL", original.email], ["ADMIN_PASSWORD", original.password], ["DATABASE_URL", original.database]] as const) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+    for (const [key, value] of [["ADMIN_EMAIL", original.email], ["ADMIN_PASSWORD", original.password], ["AUTH_SECRET", original.secret], ["DATABASE_URL", original.database]] as const) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
     await prisma.$disconnect();
   }
   console.log("PASS : avis valides, accord obligatoire, source publique unique, liste vide masquee, HTML echappe, auth refusee, sauvegarde/relecture, versions concurrentes, suppression, rollback et erreurs API. Doubles explicites en memoire ; aucun avis reel, email ni acces a une base.");

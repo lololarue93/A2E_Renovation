@@ -16,14 +16,14 @@ async function main() {
   if (summer.ok) assert.deepEqual(summer.where.createdAt, { gte: new Date("2026-03-28T23:00:00Z"), lt: new Date("2026-03-29T22:00:00Z") }, "Le jour d'ete de Paris comprend ses 23 heures");
   for (const invalid of ["status=invente", "type=invente", "consent=all", "from=2026-02-31", "to=2026-13-01", "from=2026-10-07&to=2026-10-06", "from=hier"]) assert.equal(exportLeadFilters(new URLSearchParams(invalid)).ok, false);
 
-  const email = process.env.ADMIN_EMAIL, password = process.env.ADMIN_PASSWORD, originalFind = prisma.lead.findMany;
+  const email = process.env.ADMIN_EMAIL, password = process.env.ADMIN_PASSWORD, secret = process.env.AUTH_SECRET, originalFind = prisma.lead.findMany;
   let queries = 0;
   const selected: unknown[] = [];
   const credentials = `Basic ${Buffer.from("admin@example.test:export-test-only").toString("base64")}`;
   const request = (path: string, auth = "") => new NextRequest(`http://localhost/api/admin/export/${path}`, { headers: auth ? { authorization: auth } : {} });
   try {
     prisma.lead.findMany = (async (args: { where: unknown }) => { queries += 1; selected.push(args.where); return [{ id: "test-private", name: "=HYPERLINK(\"https://example.test\")", email: "CLIENT_PRIVATE_TO_NEVER_LEAK@example.test", phone: "+33100000000", city: "\t=SUM(1;1)", typeProjet: "windows+insulation", status: "nouveau", consent: true, budget: null, createdAt: new Date("2026-10-06T10:00:00Z"), estimates: [] }]; }) as unknown as typeof prisma.lead.findMany;
-    delete process.env.ADMIN_EMAIL; delete process.env.ADMIN_PASSWORD;
+    delete process.env.ADMIN_EMAIL; delete process.env.ADMIN_PASSWORD; delete process.env.AUTH_SECRET;
     for (const handler of [exportLeads, exportReport]) { const response = await handler(request("leads")); assert.equal(response.status, 503); assert.ok(!(await response.text()).includes("CLIENT_PRIVATE_TO_NEVER_LEAK")); }
     process.env.ADMIN_EMAIL = "admin@example.test"; process.env.ADMIN_PASSWORD = "export-test-only";
     for (const handler of [exportLeads, exportReport]) for (const auth of ["", "Basic malformed==", "Basic " + Buffer.from("admin@example.test:wrong").toString("base64")]) { const response = await handler(request("leads", auth)); assert.equal(response.status, 401); assert.ok(!(await response.text()).includes("CLIENT_PRIVATE_TO_NEVER_LEAK")); }
@@ -47,6 +47,7 @@ async function main() {
     prisma.lead.findMany = originalFind;
     if (email === undefined) delete process.env.ADMIN_EMAIL; else process.env.ADMIN_EMAIL = email;
     if (password === undefined) delete process.env.ADMIN_PASSWORD; else process.env.ADMIN_PASSWORD = password;
+    if (secret === undefined) delete process.env.AUTH_SECRET; else process.env.AUTH_SECRET = secret;
     await prisma.$disconnect();
   }
   console.log("PASS : exports proteges avant lecture, CSV sans formules executables, filtres valides/invalides et dates Paris, confidentialite, coherence PDF/CSV et panne sans detail technique. Aucun acces en base de production.");

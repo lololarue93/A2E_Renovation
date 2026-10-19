@@ -29,7 +29,7 @@ async function main() {
   assert.equal(metrics.unidentified, 1); assert.equal(metrics.points[29].leads, 3);
   assert.equal(summarizeDashboardEvents([], period.keys).completionRate, null, "Un denominateur absent n'est pas transforme en zero pour cent");
 
-  const originalEmail = process.env.ADMIN_EMAIL, originalPassword = process.env.ADMIN_PASSWORD;
+  const originalEmail = process.env.ADMIN_EMAIL, originalPassword = process.env.ADMIN_PASSWORD, originalSecret = process.env.AUTH_SECRET;
   const original = { transaction: prisma.$transaction, leadFindMany: prisma.lead.findMany, leadCount: prisma.lead.count, leadGroupBy: prisma.lead.groupBy, auditFindMany: prisma.auditLog.findMany, realisationFindMany: prisma.realisation.findMany, settingsFindMany: prisma.siteSettings.findMany, settingsUpsert: prisma.siteSettings.upsert, auditCreate: prisma.auditLog.create };
   const authorization = `Basic ${Buffer.from("admin@example.test:test-admin-only").toString("base64")}`;
   const request = (path: string, method = "GET", body?: unknown, authenticated = true) => new NextRequest(`http://localhost/api/admin/${path}`, { method, headers: { ...(authenticated ? { authorization } : {}), "content-type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
@@ -49,7 +49,7 @@ async function main() {
     realisation: { create: async (input: { data: { title: string; active: boolean } }) => { const item = { id: `real-${realisations.length + 1}`, ...input.data }; realisations.push(item); return item; }, findUnique: async (input: { where: { id: string } }) => realisations.find((item) => item.id === input.where.id) ?? null, update: async (input: { where: { id: string }; data: { title: string; active: boolean } }) => { const existing = realisations.find((item) => item.id === input.where.id); if (!existing) throw new Error("Missing test item"); Object.assign(existing, input.data); return existing; } }
   };
   try {
-    delete process.env.ADMIN_EMAIL; delete process.env.ADMIN_PASSWORD;
+    delete process.env.ADMIN_EMAIL; delete process.env.ADMIN_PASSWORD; delete process.env.AUTH_SECRET;
     assert.equal((await getLeads(request("leads"))).status, 503);
     assert.equal((await getRealisations(request("realisations"))).status, 503);
     assert.equal((await getSettings(request("settings"))).status, 503);
@@ -103,6 +103,7 @@ async function main() {
     prisma.$transaction = original.transaction; prisma.lead.findMany = original.leadFindMany; prisma.lead.count = original.leadCount; prisma.lead.groupBy = original.leadGroupBy; prisma.auditLog.findMany = original.auditFindMany; prisma.realisation.findMany = original.realisationFindMany; prisma.siteSettings.findMany = original.settingsFindMany; prisma.siteSettings.upsert = original.settingsUpsert; prisma.auditLog.create = original.auditCreate;
     if (originalEmail === undefined) delete process.env.ADMIN_EMAIL; else process.env.ADMIN_EMAIL = originalEmail;
     if (originalPassword === undefined) delete process.env.ADMIN_PASSWORD; else process.env.ADMIN_PASSWORD = originalPassword;
+    if (originalSecret === undefined) delete process.env.AUTH_SECRET; else process.env.AUTH_SECRET = originalSecret;
     await prisma.$disconnect();
   }
   console.log("PASS : acces admin refuse, CRM statut/note/relecture/conflit, realisations brouillon/publication, multi-destinataires/0%/URL, erreurs API, KPI sessions et changements d'heure Europe/Paris. Stockage double de test, aucun email ni ecriture de production.");
