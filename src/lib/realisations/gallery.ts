@@ -1,8 +1,10 @@
+import { demoProjectNotice, isGeneratedDemoProject } from "./demo-projects";
+
 export type GalleryRole = "gallery" | "before" | "after";
 export type GalleryManifest = { version: 1; order: string[]; roles: Record<string, GalleryRole>; coverId: string | null; comparisonConfirmed: boolean };
 export type GalleryAsset = { id?: string; url: string; alt: string; kind: string; role?: GalleryRole; cover?: boolean };
 export type GalleryComparison = { before: GalleryAsset; after: GalleryAsset; label: string; beforeLabel?: string; afterLabel?: string };
-export type GalleryProject = { id: string; title: string; city: string; type: string; description: string; duration: string; budget: string; tags: string[]; inspiration: boolean; published?: boolean; assets: GalleryAsset[]; comparisons?: GalleryComparison[] };
+export type GalleryProject = { id: string; title: string; city: string; type: string; description: string; duration: string; budget: string; tags: string[]; inspiration: boolean; generated?: boolean; published?: boolean; assets: GalleryAsset[]; comparisons?: GalleryComparison[] };
 export const gallerySettingsKey = (id: string) => `gallery:${id}`;
 
 type StoredAsset = { id: string; kind: string; url: string; title?: string | null; alt?: string | null };
@@ -45,16 +47,20 @@ export function galleryAssets(assets: StoredAsset[], value: unknown, title: stri
 
 export function toGalleryProject(item: { id: string; title: string; city: string; type: string; description: string; duration: string; budget: string; tags: string[]; active?: boolean; media: StoredAsset[]; photos: { beforeUrl: string | null; afterUrl: string | null }[]; galleryManifest?: unknown }): GalleryProject {
   const inspiration = item.id.startsWith("demo-realisation-");
+  const generated = isGeneratedDemoProject(item.id);
   const manifest = readGalleryManifest(item.galleryManifest, item.media);
   const assets = galleryAssets(item.media, manifest, item.title);
   const comparisons: GalleryComparison[] = [];
   const before = assets.find(asset => asset.role === "before"), after = assets.find(asset => asset.role === "after");
-  if (!inspiration && manifest.comparisonConfirmed && before && after) comparisons.push({ before, after, label: "La transformation" });
+  if ((!inspiration || generated) && manifest.comparisonConfirmed && before && after) comparisons.push(generated
+    ? { before, after, label: "Simulation - images generees", beforeLabel: "Avant imagine", afterLabel: "Apres imagine" }
+    : { before, after, label: "La transformation" });
   item.photos.forEach((photo, index) => {
     const beforeAsset = photo.beforeUrl ? { url: photo.beforeUrl, alt: `Avant travaux - ${item.title}`, kind: "image", role: "before" as const } : null;
     const afterAsset = photo.afterUrl ? { url: photo.afterUrl, alt: `Après travaux - ${item.title}`, kind: "image", role: "after" as const } : null;
     for (const asset of [beforeAsset, afterAsset]) if (asset && !assets.some(existing => existing.url === asset.url)) assets.push(asset);
     if (!inspiration && beforeAsset && afterAsset && beforeAsset.url !== afterAsset.url && !comparisons.some(pair => pair.before.url === beforeAsset.url && pair.after.url === afterAsset.url)) comparisons.push({ before: beforeAsset, after: afterAsset, label: `Avant / après ${index + 1}` });
   });
-  return { id: item.id, title: item.title, city: item.city, type: item.type, description: item.description, duration: item.duration, budget: item.budget, tags: item.tags, inspiration, published: item.active, assets, comparisons };
+  const description = generated && !item.description.includes(demoProjectNotice) ? `${demoProjectNotice} ${item.description}` : item.description;
+  return { id: item.id, title: item.title, city: item.city, type: item.type, description, duration: item.duration, budget: item.budget, tags: item.tags, inspiration, generated, published: item.active, assets, comparisons };
 }

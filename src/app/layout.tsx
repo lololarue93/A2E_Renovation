@@ -50,7 +50,7 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const contact = await getSiteContactSettings();
-  return <html lang="fr"><body><AnalyticsTracker /><SiteHeader phone={contact.phone} />{children}
+  return <html lang="fr"><body><AnalyticsTracker />{process.env.A2E_LOCAL_RECIPE === "true" && <div role="note" className="border-b border-navy/15 bg-[#e9ede5] px-4 py-2 text-center text-sm text-navy">Version de démonstration · Données de recette, prix à valider avant devis.</div>}<SiteHeader phone={contact.phone} />{children}
     <footer className="site-footer"><div className="container"><div className="footer-grid">
       <div><Link href="/" className="brand"><Image src="/branding/a2e-logo.jpeg" alt="Logo A2E Rénovation" width={83} height={47} /><span>RÉNOVATION<span>Penser. Transformer. Habiter.</span></span></Link><p>Votre partenaire pour repenser votre habitat, poste par poste, en Île-de-France.</p><SocialLinks /></div>
       <div><h3>Parlons de votre projet</h3><a href={`tel:${contact.phone.replace(/[^+\d]/g, "")}`}>{contact.phone}</a><a href={`mailto:${siteSettings.email}`}>{siteSettings.email}</a><p>Île-de-France<br />Seine-et-Marne · Seine-Saint-Denis · Val-d’Oise</p></div>

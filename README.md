@@ -26,10 +26,14 @@ Avec une base de test, configurer une copie privee de .env.example puis executer
 
 ## Documentation et migration
 
+- [Pilotage, priorites et navigation admin](docs/PILOTAGE.md)
+- [Recette locale d'octobre 2026 et controles restants](docs/recette-2026-10.md)
 - [Refonte et livraison](docs/refonte-a2e-2026.md)
 - [Marche IDF et sources](docs/benchmark-marche-idf-2026.md)
 - [Cotations et catalogue](docs/quote-workspace.md)
 - [KPI et administration](docs/admin-operations-and-kpis.md)
+- [Email SMTP / Brevo et relances](docs/notifications-email.md)
+- [Dependances et correctifs](docs/dependances-2026-10.md)
 - [Migration Docker et restauration](docs/migration-docker-premium.md)
 - [Portainer UGreen](docs/deployment-ugreen.md)
 

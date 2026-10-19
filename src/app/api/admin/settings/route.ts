@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { defaultNotificationSettings, type NotificationSettingsValue } from "@/lib/settings/notification-settings";
 import { defaultSiteContactSettings, type SiteContactSettings } from "@/lib/settings/site-contact-settings";
+import { emailTransportConfig } from "@/lib/email/transport-config";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -37,8 +38,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       settings, contact: { phone, instagram, facebook, linkedin },
       saved: { notifications: Boolean(notificationRow), contact: Boolean(contactRow) },
-      brevoConfigured: Boolean(process.env.BREVO_API_KEY && process.env.BREVO_SENDER_EMAIL),
-      smtpConfigured: Boolean(process.env.SMTP_USER && process.env.SMTP_PASSWORD),
+      brevoConfigured: emailTransportConfig("brevo").configured,
+      smtpConfigured: emailTransportConfig(settings.provider === "brevo" ? "smtp" : settings.provider).configured,
+      transports: Object.fromEntries((["brevo", "smtp", "ovh", "gmail"] as const).map(provider => { const config = emailTransportConfig(provider); return [provider, { configured: config.configured, missing: config.missing }]; })),
       telegramConfigured: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID)
     }, { headers: { "Cache-Control": "no-store" } });
   } catch { return NextResponse.json({ error: "La base est indisponible. Les reglages n'ont pas pu etre charges." }, { status: 503 }); }

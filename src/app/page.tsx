@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight, Check, Layers3, Ruler, FileText } from "lucide-react";
 import { BrandHero } from "@/components/marketing/BrandHero";
+import { CustomerReviews } from "@/components/marketing/CustomerReviews";
 import { QuickEstimate } from "@/components/calculators/QuickEstimate";
 import { services } from "@/lib/site-data";
 
@@ -22,6 +23,7 @@ export default function HomePage() {
     <section className="section estimate-section"><div className="container"><div className="section-intro"><div><p className="eyebrow">02 / Votre budget, en clair</p><h2>Passer de l’idée<br />à une première estimation.</h2></div><p>Choisissez un poste pour explorer votre budget. Composez ensuite tous vos travaux, leurs dimensions et leurs options dans le simulateur.</p></div><QuickEstimate /></div></section>
     <section className="section"><div className="container inspiration-grid"><div className="inspiration-photo"><Image src="/branding/a2e-exterior-premium.jpeg" alt="Inspiration de façade contemporaine avec menuiseries, bois et terrasse" fill sizes="(max-width: 767px) 100vw, 50vw" className="object-cover" /><span className="image-caption">INSPIRATION · EXTÉRIEURS</span></div><div className="inspiration-copy"><p className="eyebrow">03 / Voir plus loin</p><h2>Le beau se voit.<br />Le soin se ressent.</h2><p>Lumière, matières, confort. Parcourez la galerie pour explorer les possibilités et les projets publiés par notre équipe.</p><Link href="/realisations" className="button-primary">Explorer la galerie <ArrowUpRight size={18} /></Link><span className="fine-print">Les visuels d’inspiration sont identifiés dans la galerie.</span></div></div></section>
     <section className="section method-section"><div className="container"><div className="section-intro"><div><p className="eyebrow">04 / La méthode A2E</p><h2>Du projet à la réalité.<br />En toute clarté.</h2></div><Link href="/equipe" className="button-text">Rencontrer l’équipe <ArrowUpRight size={17} /></Link></div><div className="method-grid">{steps.map(([n, title, text]) => <div key={n}><span>{n}</span><h3>{title}</h3><p>{text}</p></div>)}</div></div></section>
+    <CustomerReviews />
     <section className="project-invitation"><div className="container"><div><p className="eyebrow">Et si on commençait ?</p><h2>Faisons place<br />à votre projet.</h2></div><Link href="/simulateur" className="button-light" data-track="cta_click" data-track-label="Accueil - CTA final">Estimer mes travaux <ArrowUpRight size={20} /></Link></div></section>
   </main>;
 }

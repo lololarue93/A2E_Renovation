@@ -29,6 +29,7 @@ COPY --from=builder --chown=node:node /app/package.json ./package.json
 COPY --from=builder --chown=node:node /app/next.config.mjs ./next.config.mjs
 COPY --from=builder --chown=node:node /app/prisma ./prisma
 COPY --from=builder --chown=node:node /app/docker/bootstrap.ts ./docker/bootstrap.ts
+COPY --from=builder --chown=node:node /app/scripts/import-demo-projects.ts ./scripts/import-demo-projects.ts
 COPY --from=builder --chown=node:node /app/src/lib ./src/lib
 RUN mkdir -p public/uploads .next/cache && chown node:node public/uploads .next/cache
 USER node

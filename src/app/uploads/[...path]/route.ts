@@ -12,7 +12,7 @@ const contentTypes: Record<string, string> = {
   ".webp": "image/webp", ".mp4": "video/mp4", ".webm": "video/webm"
 };
 const immutableName = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.[a-z]+$/i;
-type Context = { params: { path: string[] } };
+type Context = { params: Promise<{ path: string[] }> };
 
 function inside(root: string, target: string) {
   const location = relative(root, target);
@@ -20,7 +20,7 @@ function inside(root: string, target: string) {
 }
 
 async function serve(request: NextRequest, context: Context, head: boolean) {
-  const segments = context.params.path;
+  const { path: segments } = await context.params;
   if (!Array.isArray(segments) || !segments.length || segments.length > 4 ||
     segments.some(segment => !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(segment) || segment.includes(".."))) {
     return new Response(null, { status: 404 });

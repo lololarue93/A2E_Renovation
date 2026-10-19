@@ -1,0 +1,17 @@
+.page { display:grid; gap:2rem; max-width:76rem; margin:auto; padding:3rem 1.25rem; min-height:70vh; align-items:center; }
+.eyebrow { color:#526b60; text-transform:uppercase; letter-spacing:.14em; font-size:.75rem; font-weight:700; margin-bottom:1rem; }
+.intro h1 { color:var(--navy,#1e3035); font-size:2.4rem; line-height:1.06; letter-spacing:-.04em; font-weight:600; }
+.intro > p:not(.eyebrow) { max-width:29rem; line-height:1.7; margin-top:1.5rem; color:#52615d; }
+.note { display:flex; gap:.65rem; align-items:center; color:#52615d; font-size:.875rem; margin-top:1.5rem; }
+.panel { background:white; border:1px solid #dce1da; padding:1.5rem; }
+.panel h2 { font-size:1.6rem; line-height:1.2; font-weight:600; letter-spacing:-.025em; }
+.helper,.fine { color:#52615d; font-size:.875rem; line-height:1.7; margin-top:1rem; }
+.panel form { margin-top:1.75rem; display:grid; gap:1.25rem; }
+.panel label { display:grid; gap:.55rem; font-size:.875rem; font-weight:600; }
+.panel input { width:100%; min-width:0; min-height:3.1rem; padding:.7rem .85rem; border:1px solid #a9b5ae; border-radius:.2rem; background:#fff; color:#1e3035; font:inherit; font-size:1rem; }
+.panel input:focus-visible,.panel button:focus-visible { outline:3px solid #526b60; outline-offset:3px; }
+.panel button { display:flex; justify-content:space-between; align-items:center; gap:1rem; min-height:3.2rem; padding:.8rem 1rem; border:0; border-radius:.2rem; color:white; background:#1e3035; font-weight:600; cursor:pointer; }
+.panel button:disabled { opacity:.65; cursor:wait; }
+.error { color:#8a2424; background:#fff1ef; border-left:3px solid #8a2424; padding:.8rem; font-size:.875rem; line-height:1.6; }
+.fine { margin-top:1.5rem; font-size:.8rem; }
+@media(min-width:48rem) { .page { grid-template-columns:1fr 1fr; gap:4rem; padding:5rem 2rem; }.intro h1 { font-size:3.6rem; }.panel { padding:2.5rem; } }

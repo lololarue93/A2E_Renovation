@@ -78,6 +78,7 @@ services:
       SMTP_SECURE: ${SMTP_SECURE:-true}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
     ports:
       - "${A2E_BIND_ADDRESS:-0.0.0.0}:${A2E_PORT:-3000}:3000"
     volumes:

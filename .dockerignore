@@ -15,6 +15,7 @@ public/uploads
 *.log
 *.tsbuildinfo
 .codex-*
+.local
 .env
 .env.*
 !.env.example

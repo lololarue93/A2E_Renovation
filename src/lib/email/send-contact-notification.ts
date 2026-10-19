@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { getNotificationSettings } from "@/lib/settings/notification-settings";
 import { escapeHtml } from "./notification-content";
-import { deliverNotificationEmail, validateRecipients } from "./send-lead-notification";
+import { deliverNotificationEmail, recordNotificationOutcome, validateRecipients } from "./send-lead-notification";
 
 type Contact = { leadId: string; name: string; email: string; phone: string; city?: string; type: string; message: string };
 export function contactNotificationContent(input: Contact) {
@@ -14,7 +14,9 @@ export function contactNotificationContent(input: Contact) {
 }
 
 export async function sendContactNotification(input: Contact) {
-  const settings = await getNotificationSettings();
+  let settings;
+  try { settings = await getNotificationSettings({ strict: true }); }
+  catch { return { sent: false, reason: "notification_settings_unavailable" }; }
   const recipients = validateRecipients(settings.recipients);
   const ledgerId = `notification-contact-${input.leadId}`;
   try { await prisma.webhookEvent.create({ data: { id: ledgerId, name: "notification.contactCreated", payload: { leadId: input.leadId, recipientCount: recipients.length }, status: "pending" } }); }
@@ -23,7 +25,7 @@ export async function sendContactNotification(input: Contact) {
     await prisma.webhookEvent.update({ where: { id: ledgerId }, data: { status: "skipped", payload: { leadId: input.leadId, reason: !settings.events.leadCreated ? "event_disabled" : "no_recipients" } } }).catch(() => undefined);
     return { sent: false, reason: "event_disabled_or_no_recipients" };
   }
-  const outcome = await deliverNotificationEmail({ recipients, ...contactNotificationContent(input), replyTo: input.email });
-  await prisma.webhookEvent.update({ where: { id: ledgerId }, data: { status: outcome.ok ? "sent" : "failed", payload: { leadId: input.leadId, recipientCount: recipients.length, ...(outcome.reason ? { reason: outcome.reason } : {}) } } }).catch(() => undefined);
-  return { sent: outcome.ok, reason: outcome.reason };
+  const outcome = await deliverNotificationEmail({ recipients, ...contactNotificationContent(input), replyTo: input.email }, settings);
+  const logConfirmed = await recordNotificationOutcome(ledgerId, outcome, { leadId: input.leadId, recipientCount: recipients.length });
+  return { sent: outcome.ok, partial: outcome.partial, reason: logConfirmed ? outcome.reason : "delivery_log_unconfirmed", logConfirmed };
 }

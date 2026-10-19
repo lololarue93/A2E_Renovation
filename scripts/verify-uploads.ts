@@ -20,7 +20,7 @@ async function verify() {
   process.chdir(temporaryDirectory);
   const get = (path: string[], headers?: Record<string, string>) => GET(
     new NextRequest(`https://a2e.invalid/uploads/${path.join("/")}`, { headers }),
-    { params: { path } }
+    { params: Promise.resolve({ path }) }
   );
   try {
     const complete = await get([uuidFile]);
@@ -31,7 +31,7 @@ async function verify() {
     assert.deepEqual(Buffer.from(await complete.arrayBuffer()), content);
     const etag = complete.headers.get("etag");
     assert.ok(etag);
-    const head = await HEAD(new NextRequest(`https://a2e.invalid/uploads/${uuidFile}`), { params: { path: [uuidFile] } });
+    const head = await HEAD(new NextRequest(`https://a2e.invalid/uploads/${uuidFile}`), { params: Promise.resolve({ path: [uuidFile] }) });
     assert.equal(head.status, 200);
     assert.equal(head.headers.get("content-length"), String(content.length));
     assert.equal((await head.arrayBuffer()).byteLength, 0);

@@ -5,6 +5,7 @@ import { changeGalleryManifest, galleryAssets, gallerySettingsKey, readGalleryMa
 import { GET as getMedia, POST as uploadMedia, PATCH as patchMedia, DELETE as deleteMedia } from "../src/app/api/admin/media/route";
 import { PUT as publishProject } from "../src/app/api/admin/realisations/route";
 import { getPublicRealisations } from "../src/lib/realisations/catalog";
+import { demoProjects } from "../src/lib/realisations/demo-projects";
 
 type TestAsset = { id: string; kind: string; url: string; realisationId: string; title: string; alt: string; createdAt: Date };
 async function main() {
@@ -24,6 +25,9 @@ async function main() {
   const verified = changeGalleryManifest(manifest, initial, "before", { comparisonConfirmed: true });
   assert.equal(toGalleryProject({ ...projectFields, id: "real-1", media: initial, photos: [], galleryManifest: verified }).comparisons?.length, 1);
   assert.equal(toGalleryProject({ ...projectFields, id: "demo-realisation-0", media: initial, photos: [], galleryManifest: verified }).comparisons?.length, 0, "Pas de faux avant/apres pour les anciens exemples");
+  const generated = toGalleryProject(demoProjects[0]);
+  assert.equal(generated.comparisons?.length, 1); assert.equal(generated.inspiration, true); assert.equal(generated.generated, true);
+  assert.equal(toGalleryProject({ ...projectFields, id: "demo-realisation-77-unknown", media: initial, photos: [], galleryManifest: verified }).comparisons?.length, 0, "Seuls les trois IDs generes documentes autorisent la demonstration");
   assert.equal(toGalleryProject({ ...projectFields, id: "real-1", media: [], photos: [{ beforeUrl: "/old-before.jpg", afterUrl: "/old-after.jpg" }] }).comparisons?.length, 1, "Les paires historiques explicites restent disponibles");
   assert.equal(galleryAssets(initial, null, "Chantier").length, 4);
 
@@ -66,10 +70,14 @@ async function main() {
     assert.equal((await publishProject(request("realisations", "PUT", { ...projectFields, id: "real-1", active: true }))).status, 200);
     process.env.DATABASE_URL = "postgresql://test-unused";
     const published = await getPublicRealisations(); assert.deepEqual(published.map(project => project.id), ["real-1"], "Les brouillons restent hors galerie publique");
+    delete process.env.DATABASE_URL;
+    assert.deepEqual((await getPublicRealisations()).map(project => project.id), demoProjects.map(project => project.id), "Trois exemples pour l'apercu local sans base");
+    process.env.DATABASE_URL = "postgresql://test-unused";
     assert.equal(toGalleryProject(published[0]).assets.find(asset => asset.cover)?.id, "detail");
     for (const id of ["before", "after", "video"]) assert.equal((await deleteMedia(request(`media?id=${id}`, "DELETE"))).status, 200);
     assert.equal((await deleteMedia(request("media?id=detail", "DELETE"))).status, 409, "Derniere image publiee protegee");
     assert.equal((await publishProject(request("realisations", "PUT", { ...projectFields, id: "real-1", active: false }))).status, 200);
+    assert.equal((await getPublicRealisations()).length, 0, "Une base configuree reste l'autorite meme sans fiche publiee, sans fallback demo");
     assert.equal((await deleteMedia(request("media?id=detail", "DELETE"))).status, 200);
     assert.equal(readGalleryManifest(rows.get(gallerySettingsKey("real-1")), assets).order.length, 0);
     assert.ok(audits.length > 0, "Classement, comparaison et suppression audites");

@@ -37,7 +37,7 @@ base modifiee. Le retour a cette ancienne version passe par la sauvegarde
    son `A2E_IMAGE_TAG=sha-<commit-complet>` depuis le resume.
 2. Portainer, environnement **Docker Standalone** :
    **Stacks > Add stack > Git repository**.
-3. Depot `https://github.com/lololarue93/A2E.git`, reference `refs/heads/main`,
+3. Depot `https://github.com/lololarue93/A2E_Renovation.git`, reference `refs/heads/main`,
    Compose path `docker-compose.yml`, nom de stack durable (par exemple `a2e`).
 4. Ajouter les variables de `.env.example`. Remplacer tous les placeholders.
    Les secrets restent dans Portainer ; ne pas committer de `.env`.

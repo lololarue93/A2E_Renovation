@@ -33,11 +33,15 @@ trap 'exit 143' TERM
 if [[ ${A2E_SMOKE_SKIP_BUILD:-0} != 1 ]]; then "${compose[@]}" build web; fi
 "${compose[@]}" up -d --wait --wait-timeout 180
 "${compose[@]}" exec -T web node <<'NODE'
+require('tsx/cjs');
+const assert = require('node:assert/strict');
 const { PrismaClient } = require('@prisma/client');
 const { writeFile } = require('node:fs/promises');
 const { createHash } = require('node:crypto');
+const { detailedPriceKeys } = require('/app/src/lib/pricing/price-data.ts');
 const prisma = new PrismaClient();
 (async () => {
+  assert.equal(await prisma.priceItem.count({ where: { key: { in: detailedPriceKeys } } }), 0, 'Bootstrap must not activate unreviewed detailed rates');
   const price = await prisma.priceItem.findFirst({ orderBy: { key: 'asc' } });
   if (!price) throw new Error('No catalogue initialized');
   const authorization = 'Basic ' + Buffer.from(process.env.ADMIN_EMAIL + ':' + process.env.ADMIN_PASSWORD).toString('base64');
@@ -78,7 +82,35 @@ const prisma = new PrismaClient();
   }
   const notificationAttempts = await prisma.webhookEvent.findMany({ where: { id: { in: ['notification-leadCreated-' + stored.id, 'notification-pdfGenerated-' + stored.id] } } });
   if (notificationAttempts.length !== 2 || notificationAttempts.some(event => event.status !== 'failed')) throw new Error('Notification attempts duplicated or external credentials inherited');
-  await writeFile('/app/public/uploads/a2e-verification.json', JSON.stringify({ price: { key: price.key, low: edited.low, mid: edited.mid, high: edited.high }, estimate: { id: stored.id, mid: stored.mid, lines: stored.lines.length }, image: { name: '00000000-0000-4000-8000-000000000001.png', sha256: createHash('sha256').update(image).digest('hex') } }));
+  const crmUrl = 'http://127.0.0.1:3000/api/admin/leads';
+  const crmHeaders = { authorization, 'content-type': 'application/json' };
+  const crmPayload = { requestId: '00000000-0000-4000-8000-000000000002', contact: { name: '', company: 'Docker CRM verification', email: '', phone: '0100000000', city: 'Paris', typeProjet: 'Isolation', sourceLead: 'manual', budget: null, consent: false }, nextAction: 'Appeler pour cadrer le projet', nextActionDate: '2026-10-06', note: 'Note de verification locale.' };
+  for (const method of ['GET', 'POST', 'PATCH']) {
+    assert.equal((await fetch(crmUrl, { method })).status, 401, 'CRM must reject unauthorized requests');
+  }
+  const effectCounts = await Promise.all([prisma.webhookEvent.count(), prisma.siteEvent.count()]);
+  const createdCrm = await fetch(crmUrl, { method: 'POST', headers: crmHeaders, body: JSON.stringify(crmPayload) });
+  assert.equal(createdCrm.status, 201, 'Real CRM creation or migration failed');
+  const crm = (await createdCrm.json()).lead;
+  assert.equal((await fetch(crmUrl, { method: 'POST', headers: crmHeaders, body: JSON.stringify(crmPayload) })).status, 200, 'CRM creation must remain idempotent');
+  assert.equal((await fetch(crmUrl, { method: 'POST', headers: crmHeaders, body: JSON.stringify({ ...crmPayload, note: 'Changed retry must conflict' }) })).status, 409);
+  const crmPatch = { id: crm.id, status: 'a_rappeler', previousStatus: 'nouveau', expectedVersion: 0, nextAction: 'Organiser une visite', nextActionDate: '2026-10-08', activity: { kind: 'call', note: 'Appel declare par operateur.', occurredAt: new Date().toISOString() } };
+  assert.equal((await fetch(crmUrl, { method: 'PATCH', headers: crmHeaders, body: JSON.stringify(crmPatch) })).status, 200, 'CRM update failed');
+  assert.equal((await fetch(crmUrl, { method: 'PATCH', headers: crmHeaders, body: JSON.stringify(crmPatch) })).status, 409, 'CRM stale version must be rejected');
+  const crmReread = await fetch(crmUrl + '?id=' + crm.id + '&consent=all', { headers: crmHeaders });
+  assert.equal(crmReread.status, 200);
+  const crmResult = await crmReread.json();
+  assert.equal(crmResult.total, 1);
+  const rereadCrm = crmResult.leads[0];
+  assert.equal(rereadCrm.name, crmPayload.contact.company);
+  assert.equal(rereadCrm.consent, false);
+  assert.equal(rereadCrm.status, 'a_rappeler');
+  assert.equal(rereadCrm.crmVersion, 1);
+  assert.equal(rereadCrm.nextActionAt, '2026-10-07T22:00:00.000Z');
+  assert.equal(rereadCrm.activities.length, 2, 'CRM retry must not duplicate activities');
+  assert.ok(rereadCrm.activities.some(activity => activity.kind === 'call' && activity.note === crmPatch.activity.note));
+  assert.deepEqual(await Promise.all([prisma.webhookEvent.count(), prisma.siteEvent.count()]), effectCounts, 'Manual CRM must not trigger notifications or analytics');
+  await writeFile('/app/public/uploads/a2e-verification.json', JSON.stringify({ price: { key: price.key, low: edited.low, mid: edited.mid, high: edited.high }, detailedPriceKeys, crm: { id: crm.id, status: rereadCrm.status, crmVersion: rereadCrm.crmVersion, activities: rereadCrm.activities.length }, estimate: { id: stored.id, mid: stored.mid, lines: stored.lines.length }, image: { name: '00000000-0000-4000-8000-000000000001.png', sha256: createHash('sha256').update(image).digest('hex') } }));
 })().catch(error => { console.error(error.message); process.exitCode = 1; }).finally(() => prisma.$disconnect());
 NODE
 "${compose[@]}" run --rm --no-deps migrate
@@ -90,12 +122,14 @@ for ((attempt=0; attempt<60; attempt++)); do
 done
 [[ $ready == 1 ]]
 "${compose[@]}" exec -T web node <<'NODE'
+const assert = require('node:assert/strict');
 const { PrismaClient } = require('@prisma/client');
 const { readFile } = require('node:fs/promises');
 const { createHash } = require('node:crypto');
 const prisma = new PrismaClient();
 (async () => {
   const marker = JSON.parse(await readFile('/app/public/uploads/a2e-verification.json', 'utf8'));
+  assert.equal(await prisma.priceItem.count({ where: { key: { in: marker.detailedPriceKeys } } }), 0, 'Restart must preserve manual activation of detailed rates');
   const price = await prisma.priceItem.findUnique({ where: { key: marker.price.key } });
   if (!price || ['low', 'mid', 'high'].some(field => price[field] !== marker.price[field])) throw new Error('Bootstrap or restart changed centime unit prices');
   const authorization = 'Basic ' + Buffer.from(process.env.ADMIN_EMAIL + ':' + process.env.ADMIN_PASSWORD).toString('base64');
@@ -103,6 +137,12 @@ const prisma = new PrismaClient();
   if (!response.ok) throw new Error('Post-restart catalogue reread failed');
   const reread = (await response.json()).items.find(item => item.key === marker.price.key);
   if (!reread || ['low', 'mid', 'high'].some(field => reread[field] !== marker.price[field])) throw new Error('Post-restart API changed centime unit prices');
+  const crmResponse = await fetch('http://127.0.0.1:3000/api/admin/leads?id=' + marker.crm.id + '&consent=all', { headers: { authorization } });
+  assert.equal(crmResponse.status, 200, 'Post-restart CRM reread failed');
+  const crm = (await crmResponse.json()).leads[0];
+  assert.equal(crm.status, marker.crm.status);
+  assert.equal(crm.crmVersion, marker.crm.crmVersion);
+  assert.equal(crm.activities.length, marker.crm.activities);
   const image = await readFile('/app/public/uploads/' + marker.image.name);
   if (createHash('sha256').update(image).digest('hex') !== marker.image.sha256) throw new Error('Media bytes changed after restart');
 })().catch(error => { console.error(error.message); process.exitCode = 1; }).finally(() => prisma.$disconnect());
@@ -139,19 +179,27 @@ const restored = JSON.parse(fs.readFileSync(0, "utf8"));
 for (const field of ["key", "low", "mid", "high"]) assert.equal(restored.price[field], marker.price[field], "Restored price changed: " + field);
 assert.equal(restored.priceColumnType, "double precision");
 assert.equal(restored.priceMigrationApplied, true);
+assert.equal(restored.crmMigrationApplied, true);
+assert.equal(restored.prices.filter(item => marker.detailedPriceKeys.includes(item.key)).length, 0, "Unreviewed rates appeared during restore");
+const crm = restored.crm.find(item => item.id === marker.crm.id);
+assert.ok(crm, "Restored CRM prospect missing");
+for (const field of ["status", "crmVersion", "activities"]) assert.equal(crm[field], marker.crm[field], "Restored CRM changed: " + field);
 const estimate = restored.estimates.find(item => item.id === marker.estimate.id);
 assert.ok(estimate, "Restored lead estimate missing");
 assert.equal(estimate.mid, marker.estimate.mid);
 assert.equal(estimate.lines, marker.estimate.lines);
 const image = fs.readFileSync("/target/" + marker.image.name);
 assert.equal(crypto.createHash("sha256").update(image).digest("hex"), marker.image.sha256);
-console.log("Restored centime prices, applied migration, lead estimate and media bytes verified.");
+console.log("Restored centime prices, pending rates, CRM activities, migrations, lead estimate and media bytes verified.");
 '
 SELECT json_build_object(
   'price', (SELECT json_build_object('key', "key", 'low', "low", 'mid', "mid", 'high', "high") FROM "PriceItem" ORDER BY "key" LIMIT 1),
+  'prices', (SELECT json_agg(json_build_object('key', "key")) FROM "PriceItem"),
+  'crm', (SELECT json_agg(json_build_object('id', l."id", 'status', l."status", 'crmVersion', l."crmVersion", 'activities', (SELECT count(*) FROM "LeadActivity" WHERE "leadId" = l."id"))) FROM "Lead" l WHERE l."sourceLead" = 'manual'),
   'estimates', (SELECT json_agg(json_build_object('id', e."id", 'mid', e."mid", 'lines', (SELECT count(*) FROM "EstimateLine" WHERE "estimateId" = e."id"))) FROM "Estimate" e),
   'priceColumnType', (SELECT data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'PriceItem' AND column_name = 'low'),
-  'priceMigrationApplied', EXISTS(SELECT 1 FROM "_prisma_migrations" WHERE migration_name = '20261006180000_price_item_centimes' AND finished_at IS NOT NULL)
+  'priceMigrationApplied', EXISTS(SELECT 1 FROM "_prisma_migrations" WHERE migration_name = '20261006180000_price_item_centimes' AND finished_at IS NOT NULL),
+  'crmMigrationApplied', EXISTS(SELECT 1 FROM "_prisma_migrations" WHERE migration_name = '20261006223000_lead_crm_followup' AND finished_at IS NOT NULL)
 );
 SQL
-printf 'Docker verification passed: Float migration, centime admin PUT/GET/restart/restore, readiness, permissions, live media bytes, admin rejection, recomputed persisted lead/PDF, notification deduplication and backup.\n'
+printf 'Docker verification passed: Float/CRM migrations, pending detailed rates, centime admin PUT/GET, CRM create/update/conflict/reload/restart/restore, readiness, permissions, live media bytes, admin rejection, recomputed persisted lead/PDF, notification deduplication and backup.\n'

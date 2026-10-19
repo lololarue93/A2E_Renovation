@@ -27,9 +27,16 @@ export const defaultNotificationSettings: NotificationSettingsValue = {
   signatureWindowDays: 15
 };
 
-export async function getNotificationSettings() {
-  if (!process.env.DATABASE_URL) return defaultNotificationSettings;
-  const row = await prisma.siteSettings.findUnique({ where: { key: "notifications" } }).catch(() => null);
+export async function getNotificationSettings(options: { strict?: boolean } = {}) {
+  if (!process.env.DATABASE_URL) {
+    if (options.strict) throw new Error("notification_settings_unavailable");
+    return defaultNotificationSettings;
+  }
+  const row = await prisma.siteSettings.findUnique({ where: { key: "notifications" } }).catch(() => {
+    if (options.strict) throw new Error("notification_settings_unavailable");
+    return null;
+  });
+  if (options.strict && row && (!row.value || typeof row.value !== "object" || Array.isArray(row.value))) throw new Error("notification_settings_invalid");
   if (!row || !row.value || typeof row.value !== "object" || Array.isArray(row.value)) return defaultNotificationSettings;
   const value = row.value as Partial<NotificationSettingsValue>;
   const events = value.events && typeof value.events === "object" ? value.events : {};

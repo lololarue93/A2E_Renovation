@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { ArrowUpRight, Calculator, ChartNoAxesCombined, ClipboardList, Images, Settings2, ShieldCheck, Tags } from "lucide-react";
+import { AdminLogout } from "./AdminLogout";
 
 const sections = [
   { id: "overview", label: "Activité & conversions", description: "Repérez les étapes à améliorer et les dossiers qui demandent une action.", icon: ChartNoAxesCombined },
   { id: "pipeline", label: "Dossiers clients", description: "Retrouvez les demandes, préparez la prochaine action et suivez les échanges.", icon: ClipboardList },
   { id: "pricing", label: "Catalogue de prix", description: "Les mêmes références alimentent le simulateur public et vos cotations.", icon: Tags },
-  { id: "gallery", label: "Réalisations", description: "Une fiche, ses photos, un aperçu : publiez quand le projet est prêt.", icon: Images },
+  { id: "gallery", label: "Réalisations & avis", description: "Préparez vos projets et publiez les avis réels avec l'accord de vos clients.", icon: Images },
   { id: "settings", label: "Site & notifications", description: "Mettez à jour vos coordonnées et choisissez qui reçoit les demandes.", icon: Settings2 },
   { id: "audit", label: "Journal & exports", description: "Vérifiez les envois et retrouvez les modifications enregistrées.", icon: ShieldCheck }
 ] as const;
@@ -43,6 +44,7 @@ export function AdminWorkspace({ overview, pipeline, pricing, gallery, settings,
       </aside>
       <div className="min-w-0 px-4 pb-16 pt-7 sm:px-7 lg:px-10 lg:pt-10">
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-navy/10 pb-7"><div className="max-w-xl"><p className="text-xs font-bold uppercase tracking-[.18em] text-champagne">A2E / Pilotage</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-navy sm:text-4xl">{section.label}</h1><p className="mt-3 text-sm leading-6 text-ink/65">{section.description}</p></div><Link href="/admin/cotations" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-sm bg-navy px-5 text-sm font-bold text-white"><Calculator size={17} /> Nouvelle cotation <ArrowUpRight size={16} /></Link></header>
+        <div className="flex justify-end pt-3"><AdminLogout /></div>
         <div id={active} className="pt-7">{content[active]}</div>
       </div>
     </div>

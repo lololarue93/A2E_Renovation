@@ -12,24 +12,24 @@ async function main() {
   const request = (authorization?: string) => new NextRequest("http://localhost/api/admin/pricing", { headers: authorization ? { authorization } : {} });
   try {
     delete process.env.ADMIN_EMAIL; delete process.env.ADMIN_PASSWORD;
-    for (const middleware of [rootMiddleware, sourceMiddleware]) assert.equal(middleware(request()).status, 503);
+    for (const middleware of [rootMiddleware, sourceMiddleware]) assert.equal((await middleware(request())).status, 503);
     process.env.ADMIN_EMAIL = "equipe@example.com";
     process.env.ADMIN_PASSWORD = "mot-de-passe-été-€";
     const unicodeAuth = `Basic ${Buffer.from(`${process.env.ADMIN_EMAIL}:${process.env.ADMIN_PASSWORD}`, "utf8").toString("base64")}`;
     for (const middleware of [rootMiddleware, sourceMiddleware]) {
-      assert.equal(middleware(request(unicodeAuth)).headers.get("x-middleware-next"), "1", "Le mot de passe UTF-8 est reconnu");
+      assert.equal((await middleware(request(unicodeAuth))).headers.get("x-middleware-next"), "1", "Le mot de passe UTF-8 est reconnu");
       for (const malformed of [undefined, "Basic !!!", "Basic " + Buffer.from("equipe@example.com:incorrect").toString("base64"), "Basic /w=="]) {
-        const response = middleware(request(malformed));
+        const response = await middleware(request(malformed));
         assert.equal(response.status, 401);
         assert.equal(response.headers.get("www-authenticate"), 'Basic realm="A2E Equipe", charset="UTF-8"');
         assert.equal(response.headers.get("cache-control"), "no-store");
       }
     }
     assert.equal(requireAdmin(request(unicodeAuth)), null, "L'API accepte les memes caracteres UTF-8");
-    assert.equal(requireAdmin(request())?.headers.get("www-authenticate"), rootMiddleware(request()).headers.get("www-authenticate"));
+    assert.equal(requireAdmin(request())?.headers.get("www-authenticate"), (await rootMiddleware(request())).headers.get("www-authenticate"));
     for (const endpoint of [catalog, quotes, leads]) assert.equal((await endpoint(request())).status, 401, "Les routes sont protegees sans middleware");
     process.env.ADMIN_PASSWORD = "change-me";
-    for (const middleware of [rootMiddleware, sourceMiddleware]) assert.equal(middleware(request(unicodeAuth)).status, 503);
+    for (const middleware of [rootMiddleware, sourceMiddleware]) assert.equal((await middleware(request(unicodeAuth))).status, 503);
     assert.equal(requireAdmin(request(unicodeAuth))?.status, 503);
     console.log("PASS : identifiants UTF-8, challenge coherent, refus sans configuration, mot de passe exemple, credentials invalides et routes protegees.");
   } finally {

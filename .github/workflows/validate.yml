@@ -50,22 +50,6 @@ jobs:
       - name: Apply migrations on test database
         run: pnpm exec prisma migrate deploy
       - name: Verify calculations and protected workflows
-        run: |
-          pnpm exec tsx scripts/verify-estimates.ts
-          pnpm exec tsx scripts/verify-estimator-flow.ts
-          pnpm exec tsx scripts/verify-detailed-pricing.ts
-          pnpm exec tsx scripts/verify-bootstrap.ts
-          pnpm exec tsx scripts/verify-quotations.ts
-          pnpm exec tsx scripts/verify-admin.ts
-          pnpm exec tsx scripts/verify-admin-auth.ts
-          pnpm exec tsx scripts/verify-admin-exports.ts
-          pnpm exec tsx scripts/verify-contact.ts
-          pnpm exec tsx scripts/verify-analytics-consent.ts
-          pnpm exec tsx scripts/verify-lead-analytics.ts
-          pnpm exec tsx scripts/verify-dashboard-kpis.ts
-          pnpm exec tsx scripts/verify-gallery.ts
-          pnpm exec tsx scripts/verify-crm.ts
-          pnpm exec tsx scripts/verify-uploads.ts
-          pnpm exec tsx scripts/verify-pdf-layout.ts
+        run: pnpm run qa:check
       - name: Build application
         run: pnpm run build

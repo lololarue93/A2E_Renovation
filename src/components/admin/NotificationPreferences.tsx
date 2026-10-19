@@ -5,7 +5,7 @@ import { CheckCircle2, Mail } from "lucide-react";
 
 type Provider = "brevo" | "smtp" | "ovh" | "gmail";
 type Settings = { provider: Provider; leadEmail: string; recipients: string[]; events: { leadCreated: boolean; pdfGenerated: boolean; mediaUploaded: boolean; securityAlert: boolean }; telegramEnabled: boolean; trackingEnabled: boolean; signatureDiscountPercent: number; signatureWindowDays: number; phone: string; instagram: string; facebook: string; linkedin: string };
-type Config = { brevoConfigured: boolean; smtpConfigured: boolean; telegramConfigured: boolean };
+type Config = { brevoConfigured: boolean; smtpConfigured: boolean; telegramConfigured: boolean; transports?: Record<Provider, { configured: boolean; missing: string[] }> };
 
 export function NotificationPreferences() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -44,14 +44,15 @@ export function NotificationPreferences() {
     finally { setSaving(false); }
   }
   if (!settings) return <div className="mt-5"><p role="status" className="text-sm text-ink/60">{status}</p>{error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800">{error}</p>}</div>;
-  const transportReady = settings.provider === "brevo" ? config.brevoConfigured : config.smtpConfigured;
+  const transport = config.transports?.[settings.provider];
+  const transportReady = transport?.configured ?? (settings.provider === "brevo" ? config.brevoConfigured : config.smtpConfigured);
   return <form onSubmit={save} className="mt-6 rounded-xl border border-navy/10 bg-white p-5 sm:p-6">
     <div className="mb-6 flex items-start gap-3 border-b border-navy/10 pb-5"><Mail size={20} className="mt-0.5 shrink-0 text-champagne" /><div><h3 className="font-bold text-navy">Un message au bon interlocuteur.</h3><p className="mt-2 text-sm leading-6 text-ink/60">Chaque demande peut avertir une ou plusieurs boites. Les secrets techniques sont renseignes dans Docker.</p></div></div>
     <div className="grid gap-4 md:grid-cols-2">
       <label className="grid gap-2 text-sm font-bold text-ink/80">Canal d'envoi<select className="input min-h-12" value={settings.provider} onChange={(event) => update({ provider: event.target.value as Provider })}><option value="brevo">Brevo API</option><option value="ovh">OVH SMTP</option><option value="gmail">Gmail SMTP</option><option value="smtp">Autre serveur SMTP</option></select></label>
       <label className="grid gap-2 text-sm font-bold text-ink/80 md:row-span-2">Destinataires des alertes *<textarea required className="input min-h-28 font-normal" value={recipientsText} onChange={(event) => setRecipientsText(event.target.value)} placeholder="contact@entreprise.fr" /><span className="text-xs font-normal text-ink/55">1 a 20 adresses, une par ligne. Virgules et points-virgules acceptes.</span></label>
-      <div className={`rounded-xl p-4 text-sm leading-6 ${transportReady ? "bg-[#51796c]/10 text-[#385f51]" : "bg-amber-50 text-amber-900"}`}><strong>{transportReady ? "Canal choisi configure" : "Canal choisi a configurer"}</strong><p className="mt-1">{transportReady ? "Les variables techniques sont presentes. La livraison effective depend du fournisseur et de ses journaux." : "Renseignez les variables Brevo ou SMTP de ce canal dans Portainer avant l'envoi automatique."}</p></div>
-      <label className="grid gap-2 text-sm font-bold text-ink/80">Email de secours<input className="input min-h-12" type="email" maxLength={160} value={settings.leadEmail} onChange={(event) => update({ leadEmail: event.target.value })} /></label>
+      <div className={`rounded-xl p-4 text-sm leading-6 ${transportReady ? "bg-[#51796c]/10 text-[#385f51]" : "bg-amber-50 text-amber-900"}`}><strong>{transportReady ? "Configuration presente - reception a tester" : "Canal choisi a configurer"}</strong><p className="mt-1">{transportReady ? "Les variables techniques sont presentes. La connexion et la livraison effective ne sont pas testees par ce statut." : `Variables a verifier dans Portainer : ${transport?.missing.join(", ") || "configuration du canal choisi"}.`}</p></div>
+      <label className="grid gap-2 text-sm font-bold text-ink/80">Adresse historique (facultatif)<input className="input min-h-12" type="email" maxLength={160} value={settings.leadEmail} onChange={(event) => update({ leadEmail: event.target.value })} /><span className="text-xs font-normal text-ink">Les alertes utilisent la liste de destinataires ci-dessus.</span></label>
       <label className="grid gap-2 text-sm font-bold text-ink/80">Telephone public *<input className="input min-h-12" required type="tel" minLength={6} maxLength={40} value={settings.phone} onChange={(event) => update({ phone: event.target.value })} /></label>
       <label className="grid gap-2 text-sm font-bold text-ink/80">Instagram<input className="input min-h-12" type="url" maxLength={300} placeholder="https://instagram.com/..." value={settings.instagram} onChange={(event) => update({ instagram: event.target.value })} /></label>
       <label className="grid gap-2 text-sm font-bold text-ink/80">Facebook<input className="input min-h-12" type="url" maxLength={300} placeholder="https://facebook.com/..." value={settings.facebook} onChange={(event) => update({ facebook: event.target.value })} /></label>

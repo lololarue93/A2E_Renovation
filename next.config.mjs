@@ -1,8 +1,10 @@
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    typedRoutes: false
-  },
+  outputFileTracingRoot: dirname(fileURLToPath(import.meta.url)),
+  typedRoutes: false,
   images: {
     formats: ["image/avif", "image/webp"]
   },
