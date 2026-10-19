@@ -16,6 +16,7 @@ out/
 *.db-journal
 .lighthouse/
 output/
+/tmp/
 *.log
 
 # Local tools and editor files

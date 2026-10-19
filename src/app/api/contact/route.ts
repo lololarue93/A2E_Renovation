@@ -20,12 +20,13 @@ export async function POST(request: NextRequest) {
     lead = await prisma.lead.create({ data: {
       name: input.name, phone: input.phone, email: input.email, city: input.city || null,
       consent: true, sourceLead: "website-contact", typeProjet: input.type,
-      project: { create: { type: input.type, city: input.city || null, details: { message: input.message, origin: "contact-form" } } }
+      ...(input.callbackRequested ? { status: "a_rappeler" } : {}),
+      project: { create: { type: input.type, city: input.city || null, details: { message: input.message, remarks: input.remarks || "", callbackRequested: input.callbackRequested === true, ...(input.callbackRequested ? { callbackAvailability: input.callbackAvailability || "" } : {}), origin: "contact-form" } } }
     } });
   } catch { return NextResponse.json({ error: "Votre demande n'a pas pu etre enregistree. Votre saisie est conservee ; reessayez ou contactez A2E directement." }, { status: 503 }); }
   const settings = await getNotificationSettings();
   if (settings.trackingEnabled && input.analyticsConsent === true && isAnalyticsSessionId(input.sessionId)) await prisma.siteEvent.create({ data: { event: "lead_submitted", path: "/contact", label: "contact", sessionId: input.sessionId } }).catch(() => undefined);
   await emitWebhook("lead.created", { leadId: lead.id, sourceLead: "website-contact", typeProjet: input.type }).catch(() => undefined);
-  await sendContactNotification({ leadId: lead.id, name: input.name, email: input.email, phone: input.phone, city: input.city, type: input.type, message: input.message }).catch(() => undefined);
+  await sendContactNotification({ leadId: lead.id, name: input.name, email: input.email, phone: input.phone, city: input.city, type: input.type, message: input.message, remarks: input.remarks, callbackRequested: input.callbackRequested, callbackAvailability: input.callbackAvailability }).catch(() => undefined);
   return NextResponse.json({ ok: true, leadId: lead.id }, { status: 201 });
 }

@@ -73,7 +73,8 @@
 .fieldGrid { display: grid; gap: 1rem; }
 .field { display: grid; gap: .45rem; min-width: 0; font-size: .8rem; color: var(--petrol); }
 .field > span { font-weight: 600; }
-.field :is(input, select) { display: block; width: 100%; min-width: 0; border: 1px solid #142e322e; border-radius: 5px; background: #fff; color: var(--petrol); min-height: 48px; padding: .7rem .75rem; font-size: 1rem; }
+.field :is(input, select, textarea) { display: block; width: 100%; min-width: 0; border: 1px solid #142e322e; border-radius: 5px; background: #fff; color: var(--petrol); min-height: 48px; padding: .7rem .75rem; font-size: 1rem; }
+.field textarea { min-height: 7rem; resize: vertical; }
 .field select { padding-right: 1.4rem; }
 .field input::placeholder { color: #7b8581; }
 .checkbox { display: flex; align-items: flex-start; gap: .75rem; margin: 1rem 0; font-size: .85rem; line-height: 1.65; cursor: pointer; min-height: 44px; }

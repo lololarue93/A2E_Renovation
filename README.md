@@ -2,6 +2,13 @@
 
 Cette application Next.js rassemble la vitrine, le simulateur multi-postes, les reperes de prix, le contact, les possibilites d'aides et l'administration. Le depot actif est ce dossier A2E ; la copie presente dans son parent est historique.
 
+## Documentation V1
+
+Les [guides V1 illustres](docs/v1/README.md) presentent les fonctions disponibles,
+leur utilisation et leurs limites. Deux PDF sont fournis : utilisation et
+administration ; deploiement sur NAS ou VPS et configuration email SMTP.
+Les [notes de version](docs/v1/notes-version.md) decrivent le perimetre livre.
+
 ## Demarrage local
 
 Installer Node.js 22 et pnpm 9.15.4. Executer `pnpm install --frozen-lockfile`, `pnpm exec prisma generate`, puis `pnpm dev`. Sans DATABASE_URL, la vitrine affiche une base de demonstration ; les demandes et sauvegardes ne pretendent pas fonctionner sans PostgreSQL.

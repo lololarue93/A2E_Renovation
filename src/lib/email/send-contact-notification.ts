@@ -1,15 +1,16 @@
 import { prisma } from "@/lib/db/prisma";
 import { getNotificationSettings } from "@/lib/settings/notification-settings";
-import { escapeHtml } from "./notification-content";
+import { escapeHtml, projectRequestContent, type ProjectRequestDetails } from "./notification-content";
 import { deliverNotificationEmail, recordNotificationOutcome, validateRecipients } from "./send-lead-notification";
 
-type Contact = { leadId: string; name: string; email: string; phone: string; city?: string; type: string; message: string };
+type Contact = ProjectRequestDetails & { leadId: string; name: string; email: string; phone: string; city?: string; type: string; message: string };
 export function contactNotificationContent(input: Contact) {
   const e = escapeHtml;
+  const details = projectRequestContent(input);
   return {
     subject: `A2E - Nouvelle demande de contact - ${input.leadId}`,
-    text: ["Nouvelle demande de contact A2E", `Dossier : ${input.leadId}`, `Nom : ${input.name}`, `Email : ${input.email}`, `Telephone : ${input.phone}`, `Ville : ${input.city || "Non renseignee"}`, `Projet : ${input.type}`, "Message :", input.message, "Retrouvez le dossier dans l'espace equipe."].join("\n"),
-    html: `<div style="font-family:Arial,sans-serif;color:#142e32;max-width:640px"><h2>Nouvelle demande de contact</h2><p><strong>Dossier :</strong> ${e(input.leadId)}</p><p><strong>Client :</strong> ${e(input.name)}<br><strong>Email :</strong> ${e(input.email)}<br><strong>Telephone :</strong> ${e(input.phone)}<br><strong>Ville :</strong> ${e(input.city || "Non renseignee")}<br><strong>Projet :</strong> ${e(input.type)}</p><p><strong>Message :</strong><br>${e(input.message).replace(/\n/g, "<br>")}</p><p>Consultez le dossier dans l'espace equipe et notez la prochaine action.</p></div>`
+    text: ["Nouvelle demande de contact A2E", `Dossier : ${input.leadId}`, `Nom : ${input.name}`, `Email : ${input.email || "Non renseigne"}`, `Telephone : ${input.phone || "Non renseigne"}`, `Ville : ${input.city || "Non renseignee"}`, `Projet : ${input.type}`, details.text, "Retrouvez le dossier dans l'espace equipe."].join("\n"),
+    html: `<div style="font-family:Arial,sans-serif;color:#142e32;max-width:640px"><h2>Nouvelle demande de contact</h2><p><strong>Dossier :</strong> ${e(input.leadId)}</p><p><strong>Client :</strong> ${e(input.name)}<br><strong>Email :</strong> ${e(input.email || "Non renseigne")}<br><strong>Telephone :</strong> ${e(input.phone || "Non renseigne")}<br><strong>Ville :</strong> ${e(input.city || "Non renseignee")}<br><strong>Projet :</strong> ${e(input.type)}</p>${details.html}<p>Consultez le dossier dans l'espace equipe et notez la prochaine action.</p></div>`
   };
 }
 
@@ -25,7 +26,7 @@ export async function sendContactNotification(input: Contact) {
     await prisma.webhookEvent.update({ where: { id: ledgerId }, data: { status: "skipped", payload: { leadId: input.leadId, reason: !settings.events.leadCreated ? "event_disabled" : "no_recipients" } } }).catch(() => undefined);
     return { sent: false, reason: "event_disabled_or_no_recipients" };
   }
-  const outcome = await deliverNotificationEmail({ recipients, ...contactNotificationContent(input), replyTo: input.email }, settings);
+  const outcome = await deliverNotificationEmail({ recipients, ...contactNotificationContent(input), replyTo: input.email || undefined }, settings);
   const logConfirmed = await recordNotificationOutcome(ledgerId, outcome, { leadId: input.leadId, recipientCount: recipients.length });
   return { sent: outcome.ok, partial: outcome.partial, reason: logConfirmed ? outcome.reason : "delivery_log_unconfirmed", logConfirmed };
 }

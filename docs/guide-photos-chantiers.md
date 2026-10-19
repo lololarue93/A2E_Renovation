@@ -8,8 +8,16 @@ Aucun budget, delai, avis client ou gain energetique n'est attribue a ces exempl
 
 Source unique : `src/lib/realisations/demo-projects.ts`. Prompts et provenance :
 `docs/realisations-demo-prompts.json`. Images : `public/branding/realisations-demo/`.
-Les badges et la description rappellent leur nature fictive, meme si une fiche
-de demonstration est modifiee dans l'admin.
+La collection publique les presente sous **Inspirations de renovation**, avec
+le badge **Inspiration** et les vues **Avant envisage / Apres projete**. Elle
+exprime une intention, jamais une reference de chantier execute par A2E. La
+provenance reste visible dans l'editeur admin et dans le manifeste de prompts.
+
+Les trois IDs historiques sont reconnus a la lecture. Les anciennes mentions
+de provenance presentes dans les descriptions, tags et textes alternatifs SQL
+sont nettoyees dans la presentation publique, sans mise a jour de la base.
+Titres, descriptions et medias edites restent utilises. Les vrais chantiers
+gardent leur propre texte, leurs prix/durees documentes et leurs labels.
 
 ## Import explicite dans l'admin
 
@@ -57,7 +65,8 @@ A2E_IMPORT_DEMO_PROJECTS=confirm-fictional-drafts A2E_ALLOW_DEMO_IMPORT=1 node n
 Omettre `--publish-demo` pour creer des brouillons a revoir avant publication.
 Ne pas lancer le seed global : cet import ne doit pas resynchroniser les prix,
 les utilisateurs ou d'autres donnees. Ne jamais ajouter ces variables au
-bootstrap automatique. Verifier les etiquettes de demonstration sur le site.
+bootstrap automatique. Verifier le badge Inspiration et les libelles de projet
+dans la galerie publique, puis la provenance dans l'admin.
 
 ## Prises de vue pour remplacer les exemples
 
@@ -77,5 +86,6 @@ bootstrap automatique. Verifier les etiquettes de demonstration sur le site.
 - Creer une nouvelle fiche de chantier reel dans l'admin, charger les photos,
   renseigner leurs textes alternatifs, definir la couverture et les roles,
   confirmer l'avant/apres apres controle du meme point de vue, puis publier.
-  Masquer ensuite l'exemple fictif correspondant. Garder les IDs de demonstration
-  preserves permet de conserver leur signalement explicite.
+  Masquer ensuite l'inspiration correspondante si elle n'est plus utile. Garder
+  les IDs historiques reserves aux inspirations ; ne pas les reutiliser pour
+  un vrai chantier, qui doit disposer de sa propre fiche et de ses propres photos.

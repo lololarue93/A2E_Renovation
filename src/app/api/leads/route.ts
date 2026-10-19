@@ -26,8 +26,8 @@ export async function POST(request:NextRequest) {
  const number=`A2E-${year}-${randomUUID().slice(0,8).toUpperCase()}`;
  let saved;
  try {
-  saved=await prisma.lead.create({data:{name:lead.name,phone:lead.phone,email:lead.email,city:input.city,sourceLead:"website-simulator",typeProjet:input.projectTypes?.join("+")||input.projectType,budget:result.mid,maturityScore:result.maturityScore,consent:true,
-    project:{create:{type:input.projectType,city:input.city,postalCode:input.postalCode,surface:input.surface,details:JSON.parse(JSON.stringify(input))}},
+  saved=await prisma.lead.create({data:{name:lead.name,phone:lead.phone,email:lead.email,city:input.city,sourceLead:"website-simulator",typeProjet:input.projectTypes?.join("+")||input.projectType,budget:result.mid,maturityScore:result.maturityScore,consent:true,...(lead.callbackRequested?{status:"a_rappeler"}:{}),
+    project:{create:{type:input.projectType,city:input.city,postalCode:input.postalCode,surface:input.surface,details:JSON.parse(JSON.stringify({...input,message:lead.message||"",remarks:lead.remarks||"",callbackRequested:lead.callbackRequested===true,...(lead.callbackRequested?{callbackAvailability:lead.callbackAvailability||""}:{})}))}},
     estimates:{create:{number,low:result.low,mid:result.mid,high:result.high,duration:result.duration,complexity:result.complexity,assumptions:result.assumptions,lines:{create:result.lines.map(line=>({label:line.label,quantity:line.quantity,unit:line.unit,low:line.low,mid:line.mid,high:line.high,reference:line.reference,description:line.description}))}}}
   },include:{estimates:true}});
  }catch{return NextResponse.json({error:"Enregistrement temporairement indisponible. Vos choix restent dans le navigateur."},{status:503});}
@@ -41,7 +41,7 @@ export async function POST(request:NextRequest) {
  }
  const notifications=await Promise.allSettled([
   sendTelegramLead({...lead,result},`${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/admin?lead=${saved.id}`),
-  sendLeadNotification({name:lead.name,email:lead.email,phone:lead.phone,city:input.city,number,low:result.low,mid:result.mid,high:result.high,pdf,event:"leadCreated"},estimateId)
+  sendLeadNotification({name:lead.name,email:lead.email,phone:lead.phone,city:input.city,number,low:result.low,mid:result.mid,high:result.high,pdf,event:"leadCreated",message:lead.message,remarks:lead.remarks,callbackRequested:lead.callbackRequested,callbackAvailability:lead.callbackAvailability},estimateId)
  ]);
  const emailOutcome=notifications[1].status==="fulfilled"?notifications[1].value:{sent:false};
  return NextResponse.json({ok:true,status:saved.status,leadId:saved.id,estimateId,estimateNumber:number,result,emailSent:emailOutcome.sent});

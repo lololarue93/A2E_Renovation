@@ -4,6 +4,7 @@ node_modules
 .git
 .lighthouse
 output
+tmp
 backups
 coverage
 playwright-report

@@ -1,5 +1,6 @@
 import type { LeadPayload } from "@/lib/validators/lead.schema";
 import { getNotificationSettings } from "@/lib/settings/notification-settings";
+import { projectRequestContent } from "@/lib/email/notification-content";
 
 export async function sendTelegramLead(lead: LeadPayload, adminUrl?: string) {
   const settings = await getNotificationSettings();
@@ -11,6 +12,7 @@ export async function sendTelegramLead(lead: LeadPayload, adminUrl?: string) {
   const projectType = String(lead.input.projectType ?? "non précisé");
   const city = String(lead.input.city ?? "non précisé");
   const urgency = String(lead.input.urgency ?? "non précisé");
+  const requestDetails = projectRequestContent(lead).text;
   const message = [
     "Nouveau lead A2E Rénovation",
     `Nom: ${lead.name}`,
@@ -21,6 +23,7 @@ export async function sendTelegramLead(lead: LeadPayload, adminUrl?: string) {
     `Budget: ${lead.result.low} / ${lead.result.mid} / ${lead.result.high} €`,
     `Urgence: ${urgency}`,
     `Score maturité: ${lead.result.maturityScore}/100`,
+    requestDetails.length > 2200 ? `${requestDetails.slice(0, 2200)}\n[Suite disponible dans le dossier admin]` : requestDetails,
     `Admin: ${adminUrl ?? "/admin"}`
   ].join("\n");
 

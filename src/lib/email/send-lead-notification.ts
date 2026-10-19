@@ -56,7 +56,7 @@ export async function sendLeadNotification(input: LeadNotificationInput, estimat
     await prisma.webhookEvent.update({ where: { id: ledgerId }, data: { status: "skipped", payload: { ...payload, reason } } }).catch(() => undefined);
     return { sent: false, reason };
   }
-  const outcome = await deliverNotificationEmail({ recipients, ...notificationContent(input), text: [`Dossier ${input.number ?? "A2E"}`, input.name, input.email ?? "", input.phone ?? "", `Fourchette indicative : ${input.low} a ${input.high} EUR`].join("\n"), replyTo: input.email, attachment: input.pdf ? { filename: `pre-devis-${input.number ?? "a2e"}.pdf`, content: input.pdf } : undefined }, settings);
+  const outcome = await deliverNotificationEmail({ recipients, ...notificationContent(input), replyTo: input.email || undefined, attachment: input.pdf ? { filename: `pre-devis-${input.number ?? "a2e"}.pdf`, content: input.pdf } : undefined }, settings);
   const logConfirmed = await recordNotificationOutcome(ledgerId, outcome, payload);
   return { sent: outcome.ok, partial: outcome.partial, reason: logConfirmed ? outcome.reason : "delivery_log_unconfirmed", logConfirmed };
 }

@@ -42,7 +42,7 @@ export function Estimator() {
   const [busy, setBusy] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [dossier, setDossier] = useState<{ id: string; reference: string } | null>(null);
-  const [contact, setContact] = useState({ name: "", phone: "", email: "", consent: false });
+  const [contact, setContact] = useState({ name: "", phone: "", email: "", consent: false, message: "", remarks: "", callbackRequested: false, callbackAvailability: "" });
   const heading = useRef<HTMLHeadingElement>(null);
   const started = useRef<string | undefined>(undefined);
   const { catalog, pricingError, pricingNotice } = usePricing();
@@ -95,7 +95,7 @@ export function Estimator() {
     setFirstBudget(null); clearQuickSearch();
   }
   function reset() {
-    setInput(initialEstimate()); setStep("selection"); setFurthest("selection"); setDomain("windows"); setFirstBudget(null); setStatus(""); setSubmitted(false); setDossier(null); setContact({ name: "", phone: "", email: "", consent: false }); setResetArmed(false); started.current = undefined; setDraftNote("Un nouveau projet est prêt."); clearQuickSearch();
+    setInput(initialEstimate()); setStep("selection"); setFurthest("selection"); setDomain("windows"); setFirstBudget(null); setStatus(""); setSubmitted(false); setDossier(null); setContact({ name: "", phone: "", email: "", consent: false, message: "", remarks: "", callbackRequested: false, callbackAvailability: "" }); setResetArmed(false); started.current = undefined; setDraftNote("Un nouveau projet est prêt."); clearQuickSearch();
   }
   async function downloadPdf(saved: { id: string; reference: string }) {
     setStatus("Votre dossier est enregistré. Téléchargement du pré-devis…");
@@ -120,7 +120,7 @@ export function Estimator() {
     const data = new FormData(event.currentTarget);
     const sessionId = getSessionId();
     try {
-      const response = await fetch("/api/leads", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: data.get("name"), phone: data.get("phone"), email: data.get("email"), consent: data.get("consent") === "on", input, result, sessionId, analyticsConsent: Boolean(sessionId) }) });
+      const response = await fetch("/api/leads", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: data.get("name"), phone: data.get("phone"), email: data.get("email"), consent: data.get("consent") === "on", message: contact.message, remarks: contact.remarks, callbackRequested: contact.callbackRequested, callbackAvailability: contact.callbackRequested ? contact.callbackAvailability : "", input, result, sessionId, analyticsConsent: Boolean(sessionId) }) });
       const saved = await response.json();
       if (!response.ok || !saved.estimateId) throw new Error(saved.error ?? "Vérifiez vos coordonnées et votre configuration.");
       const created = { id: String(saved.estimateId), reference: String(saved.estimateNumber) };
@@ -152,6 +152,14 @@ export function Estimator() {
           <div className={styles.documentPreview}><FileText size={35} strokeWidth={1.3} aria-hidden="true" /><div><strong>Votre pré-devis A2E</strong><p>{activeTypes.map(titleFor).join(" · ")}<br />{result.lines.length} lignes · {money(result.mid)} au point central</p></div><button type="button" onClick={() => go("budget")}>Revoir le détail</button></div>
           <form onSubmit={submitLead} className={styles.contactForm}>
             <div className={styles.fieldGrid}><Field label="Nom et prénom"><input name="name" autoComplete="name" minLength={2} maxLength={100} required value={contact.name} onChange={event => setContact(old => ({ ...old, name: event.target.value }))} /></Field><Field label="Téléphone"><input name="phone" type="tel" autoComplete="tel" minLength={6} maxLength={30} required value={contact.phone} onChange={event => setContact(old => ({ ...old, phone: event.target.value }))} /></Field><Field label="Adresse email"><input name="email" type="email" autoComplete="email" maxLength={160} required value={contact.email} onChange={event => setContact(old => ({ ...old, email: event.target.value }))} /></Field></div>
+            <div className="mt-6 grid gap-5 border-y border-navy/15 py-6">
+              <Field label="Description de votre projet (facultatif)"><textarea name="message" rows={3} maxLength={12000} className="input font-normal" value={contact.message} onChange={event => setContact(old => ({ ...old, message: event.target.value }))} placeholder="Vos envies, une demande spécifique ou un complément aux postes chiffrés…" disabled={submitted} /></Field>
+              <Field label="Remarques et contraintes (facultatif)"><textarea name="remarks" rows={3} maxLength={2000} className="input font-normal" value={contact.remarks} onChange={event => setContact(old => ({ ...old, remarks: event.target.value }))} placeholder="Accès, logement occupé, matériel à conserver, délai souhaité…" disabled={submitted} /></Field>
+              <p className={styles.helper}>Ces précisions seront transmises avec votre dossier. Les travaux ajoutés en texte libre seront étudiés par A2E ; ils ne sont pas chiffrés automatiquement dans ce budget.</p>
+              <label className={styles.checkbox}><input name="callbackRequested" type="checkbox" checked={contact.callbackRequested} disabled={submitted} onChange={event => setContact(old => ({ ...old, callbackRequested: event.target.checked }))} /><span>Je souhaite être rappelé pour préciser ce projet.</span></label>
+              {contact.callbackRequested && <Field label="Votre préférence de rappel (facultatif)"><input name="callbackAvailability" maxLength={160} disabled={submitted} value={contact.callbackAvailability} onChange={event => setContact(old => ({ ...old, callbackAvailability: event.target.value }))} placeholder="Ex. le matin, ou après 17 h" aria-describedby="estimate-callback-help" /></Field>}
+              {contact.callbackRequested && <p id="estimate-callback-help" className={styles.helper}>Votre préférence est transmise à l’équipe. Le créneau reste à convenir ensemble.</p>}
+            </div>
             <label className={styles.checkbox}><input name="consent" type="checkbox" required checked={contact.consent} onChange={event => setContact(old => ({ ...old, consent: event.target.checked }))} /><span>J’accepte d’être recontacté au sujet de ce projet. <Link href="/politique-confidentialite">Confidentialité</Link></span></label>
             <button disabled={busy || submitted || Boolean(pricingError)} className={styles.primary}>{busy ? "Préparation en cours…" : submitted ? "Dossier enregistré" : "Obtenir mon dossier PDF"}{submitted ? <CheckCircle2 size={18} /> : <ArrowRight size={18} />}</button>
             {dossier && <button type="button" className={styles.secondary} disabled={busy} onClick={retryPdf}>Télécharger à nouveau le PDF <FileText size={17} /></button>}

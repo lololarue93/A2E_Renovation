@@ -33,11 +33,21 @@ async function main() {
   for (const item of demoProjects) {
     assert.equal(item.active, false); assert.equal(item.duration, ""); assert.equal(item.budget, "");
     const gallery = toGalleryProject(item);
-    assert.equal(gallery.generated, true); assert.equal(gallery.inspiration, true);
-    assert.equal(gallery.comparisons?.length, 1); assert.ok(gallery.description.includes(demoProjectNotice));
-    assert.equal(gallery.comparisons?.[0].beforeLabel, "Avant imagine");
+    assert.equal(gallery.inspiration, true); assert.equal("generated" in gallery, false, "La provenance reste hors presentation publique");
+    assert.equal(gallery.comparisons?.length, 1); assert.equal(gallery.description.includes(demoProjectNotice), false);
+    assert.equal(gallery.comparisons?.[0].beforeLabel, "Avant envisag\u00e9");
+    assert.equal(gallery.comparisons?.[0].afterLabel, "Apr\u00e8s projet\u00e9");
     assert.equal(gallery.assets.find(asset => asset.cover)?.role, "after");
-    assert.ok(toGalleryProject({ ...item, description: "Description modifiee dans l'admin." }).description.startsWith(demoProjectNotice), "Le signalement reste present apres edition");
+    assert.equal(toGalleryProject({ ...item, description: "Description modifiee dans l'admin." }).description, "Description modifiee dans l'admin.", "Une edition ne recoit aucune mention technique forcee");
+    const legacy = { ...item, active: true, description: `${demoProjectNotice} Une intention a adapter a la maison.`, tags: ["Sejour", "Projet fictif", "Images generees"], media: item.media.map(asset => ({ ...asset, title: `${asset.title} (image generee)`, alt: `Image generee, projet fictif : ${asset.alt}, apres imagine` })) };
+    const snapshot = JSON.stringify(legacy);
+    const publicLegacy = toGalleryProject(legacy);
+    assert.equal(JSON.stringify(legacy), snapshot, "Conversion a la lecture, aucune edition de la fiche source");
+    assert.equal(publicLegacy.inspiration, true); assert.equal(publicLegacy.published, true);
+    assert.deepEqual(publicLegacy.tags, ["Sejour"]);
+    assert.equal(publicLegacy.description, "Une intention a adapter a la maison.");
+    const copy = [publicLegacy.title, publicLegacy.description, ...publicLegacy.tags, ...publicLegacy.assets.map(asset => asset.alt), ...(publicLegacy.comparisons ?? []).flatMap(pair => [pair.label, pair.beforeLabel, pair.afterLabel])].join(" ").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    assert.equal(/fictif|images? generees?|chantier A2E|avant travaux|apres travaux/i.test(copy), false, "Les anciennes fiches SQL sont presentees comme des inspirations, sans attribution de chantier");
     const dimensions = await Promise.all(item.media.map(asset => sharp(join(process.cwd(), "public", asset.url.replace(/^\/+/, ""))).metadata()));
     for (const image of dimensions) { assert.equal(image.format, "webp"); assert.equal(image.width, 1200); assert.equal(image.height, 800); }
   }
@@ -56,7 +66,7 @@ async function main() {
   await importDemoProjects(published.prisma, { publishDemo: true });
   for (const item of demoProjects) assert.equal(published.projects.get(item.id)?.active, true, "Publication opt-in seulement lors de la creation");
   assert.equal(published.projects.get("real-untouched")?.title, "Chantier reel");
-  console.log("PASS : 3 paires WebP locales, signalement fictif persistant, roles/couverture, gardes, import brouillon/publication opt-in et reexecution sans ecrasement. Aucun acces base reel.");
+  console.log("PASS : 3 paires WebP locales, presentation inspiration y compris anciennes fiches, provenance privee, roles/couverture, gardes, import brouillon/publication opt-in et reexecution sans ecrasement. Aucun acces base reel.");
 }
 
 main().catch(error => { console.error(error); process.exitCode = 1; });

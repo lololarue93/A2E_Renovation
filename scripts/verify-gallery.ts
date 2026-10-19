@@ -26,7 +26,16 @@ async function main() {
   assert.equal(toGalleryProject({ ...projectFields, id: "real-1", media: initial, photos: [], galleryManifest: verified }).comparisons?.length, 1);
   assert.equal(toGalleryProject({ ...projectFields, id: "demo-realisation-0", media: initial, photos: [], galleryManifest: verified }).comparisons?.length, 0, "Pas de faux avant/apres pour les anciens exemples");
   const generated = toGalleryProject(demoProjects[0]);
-  assert.equal(generated.comparisons?.length, 1); assert.equal(generated.inspiration, true); assert.equal(generated.generated, true);
+  assert.equal(generated.comparisons?.length, 1); assert.equal(generated.inspiration, true); assert.equal("generated" in generated, false);
+  assert.equal(generated.comparisons?.[0].beforeLabel, "Avant envisag\u00e9"); assert.equal(generated.comparisons?.[0].afterLabel, "Apr\u00e8s projet\u00e9");
+  const companyCopy = { ...projectFields, id: "real-1", title: "Realisation editee", description: "Texte factuel de l'equipe, sans libelle impose.", duration: "Deux semaines", budget: "Budget reel documente", tags: ["Finitions"], media: initial, photos: [], galleryManifest: verified };
+  const realProject = toGalleryProject(companyCopy);
+  assert.equal(realProject.inspiration, false); assert.equal(realProject.title, companyCopy.title); assert.equal(realProject.description, companyCopy.description); assert.deepEqual(realProject.tags, companyCopy.tags);
+  assert.equal(realProject.duration, companyCopy.duration); assert.equal(realProject.budget, companyCopy.budget);
+  assert.equal(realProject.comparisons?.[0].label, "La transformation"); assert.equal(realProject.comparisons?.[0].beforeLabel, undefined, "Les vraies realisations conservent leurs labels avant/apres");
+  const customDemo = toGalleryProject({ ...demoProjects[0], title: "Inspiration editee", description: "Une nouvelle intention redigee par l'equipe.", budget: "Ne pas attribuer de budget client", duration: "Ne pas attribuer de duree", media: demoProjects[0].media.map(asset => ({ ...asset, alt: "Materiau choisi par l'equipe" })) });
+  assert.equal(customDemo.title, "Inspiration editee"); assert.equal(customDemo.description, "Une nouvelle intention redigee par l'equipe.");
+  assert.ok(customDemo.assets.every(asset => asset.alt === "Materiau choisi par l'equipe")); assert.equal(customDemo.duration, ""); assert.equal(customDemo.budget, "");
   assert.equal(toGalleryProject({ ...projectFields, id: "demo-realisation-77-unknown", media: initial, photos: [], galleryManifest: verified }).comparisons?.length, 0, "Seuls les trois IDs generes documentes autorisent la demonstration");
   assert.equal(toGalleryProject({ ...projectFields, id: "real-1", media: [], photos: [{ beforeUrl: "/old-before.jpg", afterUrl: "/old-after.jpg" }] }).comparisons?.length, 1, "Les paires historiques explicites restent disponibles");
   assert.equal(galleryAssets(initial, null, "Chantier").length, 4);
