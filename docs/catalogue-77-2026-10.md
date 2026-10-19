@@ -10,8 +10,21 @@ Plusieurs pages sont indexees ; sans panier local, devis et disponibilite confir
 - Source des valeurs de demonstration : `src/lib/pricing/price-data.ts`, 80 references dont 25 detaillees.
 - Quinze descriptifs/references ont ete revus pour expliciter fournitures, pose, liaisons, exclusions et comparabilite.
 - Aucun montant bas/central/haut n'a ete modifie : les reperes trouves ne valident pas exactement les memes perimetres.
-- Les lignes detaillees conservent un scenario TTC 20 %. Ce scenario ne determine pas la TVA du chantier du client.
-- Les montants entreprise en base restent la source active ; aucun import, SQL, seed ou changement de bootstrap n'a ete execute.
+- Les 25 lignes detaillees et les six ancres qui decrivent explicitement un scenario TTC 20 % portent ce taux dans les fichiers de reference. Correction du 19/10 : `ite_pse`, `ite_rockwool`, `ite_graphite`, `ite_wood`, `pac_air_water` et `electric_full` exportaient auparavant 10 % par defaut malgre leur descriptif. Montants inchanges ; aucun changement du defaut historique des autres lignes. Ce scenario ne determine pas la TVA du chantier du client.
+- L'apercu local a recu les 80 references par import explicite de recette. Les montants entreprise en base restent la source active : cette correction des fichiers ne change aucun prix ni taux deja enregistre et ne lance aucun import automatique ou seed sur le NAS. Relire aussi les taux des anciennes lignes dans l'admin.
+
+## Nature de la base chargee
+
+Catalogue de depart A2E : hypotheses internes de perimetre, fourchettes et gammes,
+avec quelques ancres recoupees dans le benchmark IDF et les comparaisons 77 ci-dessous.
+Aucune base Batiprix/BatiChiffrage, facture A2E ou grille fournisseur negociee
+n'a ete importee. Les 80 references ne sont donc pas 80 prix observes ou valides
+par des devis locaux. La peinture fait partie du benchmark, mais aucun poste
+peinture dedie n'est encore present dans le catalogue.
+
+Avant devis, adapter reference exacte, achat net, temps de pose, deplacement,
+frais, marge et TVA. L'administration et les imports CSV restent la source
+operationnelle ; les reperes publics ne remplacent pas ces donnees entreprise.
 
 ## Observations primaires
 

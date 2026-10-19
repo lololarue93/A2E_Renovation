@@ -1,9 +1,21 @@
 # Migration Docker premium A2E
 
 Ce dossier prepare la mise a jour de l'installation NAS UGreen / Portainer /
-Nginx Proxy Manager connue dans le depot. Aucun acces au NAS, push GitHub ou
-deploiement distant n'a ete effectue. Verifier les noms de volumes, les donnees,
-la version Docker/Portainer et le domaine reel sur le NAS.
+Nginx Proxy Manager connue dans le depot. La livraison est integree sur GitHub
+dans `main` par la [PR #8](https://github.com/lololarue93/A2E_Renovation/pull/8).
+Les workflows Validate et Docker ont reussi pour le commit
+`31a6122327f4086e61fcacb12ed065dc9fdb7489` et son image est publiee :
+
+```text
+ghcr.io/lololarue93/a2e-renovation:sha-31a6122327f4086e61fcacb12ed065dc9fdb7489
+digest sha256:9ecdfb86bfbae79fa2e95e536dd3585d62146a37af550c583d8dfaa2f991e7b9
+```
+
+Cette preuve concerne cette livraison precise. Pour un correctif ulterieur,
+attendre son workflow Docker reussi et relever son propre tag SHA publie.
+Le NAS et les envois email reels restent a configurer et verifier ; aucun acces
+au NAS ni deploiement sur celui-ci n'a ete effectue. Verifier les noms de volumes,
+les donnees, la version Docker/Portainer et le domaine reel sur le NAS.
 
 ## 1. Relever l'installation
 
@@ -55,19 +67,34 @@ neufs. Format custom et restauration : documentations officielles
 
 ## 3. Mettre a jour la stack existante
 
-1. Apres validation et push autorise sur `main` vers GitHub, attendre le workflow Docker
-   reussi. Il construit et teste l'image avant publication. Relever le tag SHA
-   complet dans son resume ; cette livraison locale ne pousse pas le depot.
-2. Dans la stack existante, renseigner `A2E_IMAGE_TAG=sha-<commit-complet>`.
+Dans Portainer, ouvrir **Stacks**, puis la stack A2E deja installee. Apres le
+preflight et la sauvegarde ci-dessus :
+
+1. **Stack Git** : conserver le depot `https://github.com/lololarue93/A2E_Renovation`,
+   selectionner la branche `main` (`refs/heads/main` si Portainer attend une ref)
+   et le chemin Compose `docker-compose.yml`. **Stack editeur** : remplacer le
+   texte par le dernier `docker-compose.yml` de `main`, en conservant les
+   adaptations de ports, reseaux, chemins et volumes relevees au preflight.
+   Une simple recreation de l'ancien service web ne suffit pas : le nouveau
+   Compose ajoute les services de preparation obligatoires.
+2. Dans **Environment variables**, conserver les variables et secrets existants,
+   puis renseigner le tag publie choisi. Pour la livraison validee ci-dessus :
+   `A2E_IMAGE_TAG=sha-31a6122327f4086e61fcacb12ed065dc9fdb7489`.
+   Pour inclure un correctif suivant, utiliser le tag de son dernier workflow
+   Docker reussi, sans deviner un SHA ni utiliser `latest`.
 3. Renseigner `POSTGRES_IMAGE` avec l'image major 16 observee au preflight. Garder
    cette image pendant la premiere migration fonctionnelle ; programmer une mise
    a jour de patch distincte, sauvegardee et testee. Ne pas passer au major 17/18.
-4. Garder les identifiants SQL et `DATABASE_URL` existants. Configurer un mot de
-   passe admin d'au moins 12 caracteres. Conserver le nom de stack et le chemin
-   `docker-compose.yml`.
+4. Garder les identifiants SQL, `DATABASE_URL`, `ADMIN_EMAIL` et le mot de passe
+   admin existants (au moins 12 caracteres). Ajouter `AUTH_SECRET` s'il manque :
+   une valeur aleatoire privee d'au moins 32 caracteres, conservee pour les
+   redeploiements suivants. Verifier `NEXT_PUBLIC_SITE_URL` avec le domaine HTTPS
+   reel. Conserver le meme nom de stack et les memes noms de volumes ; ne pas
+   creer une nouvelle stack ni supprimer les volumes pour faire cette mise a jour.
 5. Stack Git : **Pull and redeploy**. Stack editeur : **Update the stack** avec
    **Re-pull image / Pull latest images**, selon la version de Portainer. Le pull
-   tire le tag precise ; ne pas utiliser `latest` pour selectionner une version.
+   tire le tag precise. Si le pull GHCR est refuse, verifier l'acces a l'image
+   et le registre configure dans Portainer avant de poursuivre.
 6. Attendre `migrate` et `media-init` en **Exited (0)**, puis SQL et web healthy.
 7. Maintenir l'acces public en maintenance. Depuis l'admin de la nouvelle image,
    revoir puis importer seulement `docs/prix-detail-a-la-carte-2026.csv` (25
@@ -88,8 +115,9 @@ service de migration.
 La migration additive `20261006223000_lead_crm_followup` cree `company`,
 `nextAction`, `nextActionAt`, `crmVersion` et la table `LeadActivity`. Les anciens
 dossiers et notes restent disponibles. Elle est necessaire pour la base de
-prospection et les compteurs de relances ; le workflow CI applique les migrations
-sur PostgreSQL de test, mais aucun deploy SQL/NAS n'a ete execute localement.
+prospection et les compteurs de relances ; le workflow CI a applique les migrations
+sur PostgreSQL de test. La migration de la base du NAS reste a executer par la
+stack cible ; les donnees de production n'ont pas ete modifiees ici.
 
 Le migrator applique `prisma migrate deploy`, puis cree seulement les donnees
 absentes. Les prix personnalises et reglages existants sont preserves. Le seed
@@ -221,7 +249,7 @@ Une restauration revient a l'instant sauvegarde. Rapprocher les leads, cotations
 et medias ajoutes depuis avant une bascule qui les rendrait indisponibles. Aucun
 script ne retrograde le schema en place ou n'efface ces nouvelles donnees.
 
-## Verification de la livraison locale
+## Preuves de livraison et controles restant sur le NAS
 
 Le test `node node_modules/tsx/dist/cli.mjs scripts/verify-uploads.ts` a reussi
 localement : lecture et HEAD, types autorises, cache, plages video, fichiers
@@ -230,18 +258,22 @@ scripts Bash ont passe une verification de syntaxe. Ces controles ne remplacent
 pas le demarrage de la stack et une restauration sur un moteur Docker.
 
 Le poste Windows de refonte ne fournit ni CLI/moteur Docker ni distribution WSL.
-La construction d'image, le healthcheck reel, la restauration SQL et la
-persistance Docker ne peuvent donc pas etre declares testes ici. Le script
-isole `scripts/docker/smoke.sh` et le passage CI avant publication sont fournis ;
-ils doivent reussir sur un hote Docker. Le parcours NAS, le pull GHCR, Portainer,
-HTTPS et les ressources du NAS restent a constater dans votre infrastructure.
+Les controles Docker ont ete executes sur le moteur Linux de GitHub Actions :
+[Validate #39234532570](https://github.com/lololarue93/A2E_Renovation/actions/runs/39234532570)
+et [Docker #39234532630](https://github.com/lololarue93/A2E_Renovation/actions/runs/39234532630)
+ont reussi pour le commit publie ci-dessus. L'image a ete construite, testee puis
+publiee. Le smoke a verifie les migrations, le healthcheck, les relectures admin,
+la persistance apres redemarrage et la restauration SQL/medias dans des volumes
+neufs. Ces volumes de recette sont distincts de ceux du NAS.
+Le parcours NAS, le pull GHCR depuis celui-ci, Portainer, HTTPS et ses ressources
+restent a constater dans votre infrastructure.
 
 Le smoke Docker fourni exerce un POST de demande sur PostgreSQL, verifie que les
 montants falsifies du client sont remplaces par le catalogue serveur et que le
 dossier et ses lignes sont stockes, puis parse les deux telechargements du meme
 PDF avec `pdf-lib`. Le test neutralise les secrets de notification et controle
-les tentatives uniques. Il s'agit d'un scenario prepare pour CI/hote de test,
-pas d'une execution declaree reussie localement.
+les tentatives uniques. Ce scenario a reussi en CI sur la livraison identifiee,
+sans envoi d'email reel ; il ne constitue pas un test sur le NAS.
 
 Il controle egalement le PUT admin a 17,50 / 27,50 / 37,50, les relectures GET
 admin/publiques, la conservation apres rerun du migrator et restart, puis les

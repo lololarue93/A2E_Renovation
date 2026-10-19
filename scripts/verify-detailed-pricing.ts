@@ -70,6 +70,7 @@ async function main() {
  assert.equal(estimateProject(legacy).mid,Math.round(find("electric_partial").mid*25)+find("electric_panel").mid+find("electric_point").mid*2,"Un vieux dossier conserve son calcul au catalogue courant");
  for(const sample of [sockets,panel,pack,wc,sanitary,result,finishes,estimateProject({...bathroom,access:"difficult",urgency:"fast"})]) for(const scenario of ["low","mid","high"] as const) assert.equal(sample[scenario],sample.lines.reduce((sum,line)=>sum+line[scenario],0));
  assert.equal(JSON.stringify(electric),before);assert.equal(JSON.stringify(priceItems),catalogBefore);
+ for(const item of priceItems) if(/TTC\s*20\s*%/.test(item.description ?? "")) assert.equal(item.vatRate,20,`${item.key}: le taux doit correspondre au scenario TTC decrit`);
  const canonical=priceItems.map(validatePriceItem);assert.deepEqual(parseCatalogCsv(exportCatalogCsv(priceItems)),canonical);
  assert.equal(new Set(priceItems.map(item=>item.key)).size,priceItems.length);
  const databaseUrl=process.env.DATABASE_URL;delete process.env.DATABASE_URL;
